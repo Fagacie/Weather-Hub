@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login | WeatherHub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-bg">
+  <a href="index.html" class="btn btn-link back-btn position-absolute top-0 start-0 m-3"><i class="bi bi-arrow-left"></i> Back</a>
+  <div class="auth-container d-flex flex-column justify-content-center align-items-center min-vh-100">
+    <div class="auth-card glass-card p-4 p-md-5 shadow-lg">
+      <div class="text-center mb-4">
+        <span class="auth-logo d-inline-flex align-items-center justify-content-center mb-2">
+          <i class="bi bi-cloud-sun-fill"></i>
+        </span>
+        <h2 class="fw-bold mb-0 translatable">Sign In</h2>
+      </div>
+      <form id="loginForm" autocomplete="off">
+        <div class="form-floating mb-3">
+          <input type="email" class="form-control" id="loginEmail" placeholder="Email" required>
+          <label for="loginEmail" class="translatable">Email address</label>
+        </div>
+        <div class="form-floating mb-3 position-relative">
+          <input type="password" class="form-control" id="loginPassword" placeholder="Password" required>
+          <label for="loginPassword" class="translatable">Password</label>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2 mt-2 translatable">Login</button>
+        <div id="loginMsg" class="mt-3 translatable text-center"></div>
+        <div class="text-center mt-3">
+          <a href="register.html" class="translatable">Don't have an account? Register</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase & Auth JS -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/translate.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      initTranslation();
+      document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const msg = document.getElementById('loginMsg');
+        loginUser(email, password, function(error) {
+          if (error) {
+            msg.textContent = error.message;
+            msg.classList.add('text-danger');
+          } else {
+            msg.textContent = 'Login successful!';
+            msg.classList.remove('text-danger');
+            msg.classList.add('text-success');
+            setTimeout(() => window.location.href = 'index.html', 1200);
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

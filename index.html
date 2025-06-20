@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Weather Hub | Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg mb-4 weather-navbar glass-navbar fixed-top shadow-sm py-2">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="index.html">
+        <span class="navbar-logo rounded-circle d-flex align-items-center justify-content-center">
+          <i class="bi bi-cloud-sun-fill"></i>
+        </span>
+        <span class="translatable">WeatherHub</span>
+      </a>
+      <button class="navbar-toggler custom-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+        <ul class="navbar-nav align-items-center gap-1">
+          <li class="nav-item"><a class="nav-link active translatable" href="index.html">Home</a></li>
+          <li class="nav-item"><a class="nav-link translatable" href="map.html">Map</a></li>
+          <li class="nav-item"><a class="nav-link translatable" href="login.html">Login</a></li>
+          <li class="nav-item"><a class="nav-link translatable" href="about.html">About</a></li>
+          <li class="nav-item ms-2">
+            <select id="languageSelect" class="form-select form-select-sm" style="min-width:110px;">
+              <option value="en" selected>English</option>
+            </select>
+          </li>
+          <li class="nav-item ms-2">
+            <button id="themeToggle" class="btn btn-outline-secondary btn-sm" title="Toggle dark/light mode">
+              <i class="bi bi-moon-stars-fill" id="themeIcon"></i>
+            </button>
+          </li>
+          <li class="nav-item ms-2 dropdown">
+            <a href="#" class="nav-link dropdown-toggle d-flex align-items-center gap-1" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Profile menu">
+              <span class="rounded-circle d-inline-block profile-avatar">
+                <i class="bi bi-person text-white"></i>
+              </span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
+              <li><a class="dropdown-item translatable" href="profile.html">Profile</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item translatable" href="#" id="logoutMenuBtn">Logout</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  <div style="height:64px;"></div> <!-- Spacer for fixed navbar -->
+
+  <!-- Loader overlay -->
+  <div id="loaderOverlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(34,34,34,0.6);z-index:2000;align-items:center;justify-content:center;">
+    <div class="spinner-border text-primary" style="width:4rem;height:4rem;" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+
+  <!-- Toast notification container -->
+  <div id="toastContainer" style="position:fixed;top:1rem;right:1rem;z-index:3000;"></div>
+
+  <div class="container-fluid homepage-grid">
+    <div class="row justify-content-center align-items-start g-4">
+      <!-- Main Weather Card -->
+      <div class="col-lg-5 col-md-8">
+        <div class="frosted weather-main-card p-4 mb-4 text-center position-relative">
+          <button class="btn btn-light btn-refresh position-absolute top-0 end-0 m-2" id="refreshWeatherBtn" title="Refresh Weather"><i class="bi bi-arrow-clockwise"></i></button>
+          <div class="mb-2 d-flex justify-content-center align-items-center gap-2 position-relative">
+            <i class="bi bi-geo-alt"></i>
+            <span id="locationName" class="fw-bold translatable">...</span>
+          </div>
+          <div id="animatedWeatherIcon" style="height:80px;margin-bottom:1rem;"></div>
+          <div class="main-weather" id="weatherMain" class="translatable">...</div>
+          <div class="display-3" id="weatherTemp" class="translatable">...</div>
+          <div id="weatherDate" class="mb-2 translatable">...</div>
+        </div>
+        <!-- Fun Fact Card -->
+        <div class="frosted tips-card mb-4 text-center" id="funFactCard">
+          <i class="bi bi-lightbulb-fill text-warning"></i>
+          <span id="funFactText">Loading fun fact...</span>
+        </div>
+        <!-- World Capitals Weather Card -->
+        <div class="frosted p-3 mb-4 world-capitals-card">
+          <div class="mb-2 d-flex align-items-center gap-2">
+            <i class="bi bi-globe"></i> <span class="translatable">World Capitals Weather</span>
+            <span id="capitalsCount" class="ms-2 small text-muted"></span>
+          </div>
+          <div class="mb-3">
+            <input type="text" id="capitalSearch" class="form-control" placeholder="Search capital or country...">
+          </div>
+          <div id="nearbyPlaces" class="horizontal-scroll"></div>
+        </div>
+      </div>
+      <!-- Forecast & Air Quality Card -->
+      <div class="col-lg-4 col-md-8">
+        <div class="frosted p-4 mb-4 air-card">
+          <ul class="nav nav-tabs mb-3" id="forecastTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active translatable" id="now-tab" data-bs-toggle="tab" data-bs-target="#now" type="button" role="tab">Now</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link translatable" id="hourly-tab" data-bs-toggle="tab" data-bs-target="#hourly" type="button" role="tab">24-hour</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link translatable" id="daily-tab" data-bs-toggle="tab" data-bs-target="#daily" type="button" role="tab">5-day</button>
+            </li>
+          </ul>
+          <div class="tab-content" id="forecastTabsContent">
+            <div class="tab-pane fade show active" id="now" role="tabpanel">
+              <div><i class="bi bi-thermometer-half"></i> <span class="translatable">Real Feel</span>: <span id="realFeel">--</span></div>
+              <div><i class="bi bi-wind"></i> <span class="translatable">Wind</span>: <span id="windSpeed">--</span></div>
+              <div><i class="bi bi-cloud-drizzle"></i> <span class="translatable">Chance of rain</span>: <span id="rainChance">--</span></div>
+              <div><i class="bi bi-brightness-high"></i> <span class="translatable">UV Index</span>: <span id="uvIndex">--</span></div>
+            </div>
+            <div class="tab-pane fade" id="hourly" role="tabpanel">
+              <div id="hourlyForecast" class="d-flex flex-row gap-3"></div>
+            </div>
+            <div class="tab-pane fade" id="daily" role="tabpanel">
+              <div id="forecastIcons" class="d-flex gap-2"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Air Quality Card (placeholder for future) -->
+        <div class="frosted air-quality-card mb-4 text-center d-none" id="airQualityCard">
+          <i class="bi bi-wind text-info"></i>
+          <span id="airQualityText">Air Quality: --</span>
+        </div>
+        <!-- Weather Alerts Card -->
+        <div class="frosted weather-alert-card mb-4" id="weatherAlertCard" style="display:none;">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size:1.5rem;"></i>
+            <span class="fw-bold">Weather Alert</span>
+          </div>
+          <div id="weatherAlertContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="capitalModal" tabindex="-1" aria-labelledby="capitalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title translatable" id="capitalModalLabel">Capital Weather Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="capitalModalBody">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/giphy.js"></script>
+  <script src="js/weather.js"></script>
+  <script src="js/translate.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // --- Modern UI/UX Enhancements ---
+    function showLoader(show) {
+      const loader = document.getElementById('loaderOverlay');
+      if (show) loader.classList.add('active');
+      else loader.classList.remove('active');
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = message;
+      if (type === 'error') toast.style.background = '#ffebee', toast.style.color = '#b71c1c';
+      document.getElementById('toastContainer').appendChild(toast);
+      setTimeout(() => { toast.style.opacity = 0; toast.style.transform = 'translateY(-20px)'; }, 2500);
+      setTimeout(() => { toast.remove(); }, 3000);
+    }
+
+    // --- Dark/Light Mode Toggle ---
+    document.getElementById('themeToggle').onclick = function() {
+      document.body.classList.toggle('dark-mode');
+      const icon = document.getElementById('themeIcon');
+      if (document.body.classList.contains('dark-mode')) {
+        icon.classList.remove('bi-moon-stars-fill');
+        icon.classList.add('bi-brightness-high-fill');
+      } else {
+        icon.classList.remove('bi-brightness-high-fill');
+        icon.classList.add('bi-moon-stars-fill');
+      }
+      localStorage.setItem('weatherhub-theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+    };
+    // On load, set theme from localStorage
+    if (localStorage.getItem('weatherhub-theme') === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.getElementById('themeIcon').classList.remove('bi-moon-stars-fill');
+      document.getElementById('themeIcon').classList.add('bi-brightness-high-fill');
+    }
+
+    // --- Animated Weather Icon (SVG) ---
+    function setAnimatedWeatherIcon(weather) {
+      const iconDiv = document.getElementById('animatedWeatherIcon');
+      let svg = '';
+      switch (weather.toLowerCase()) {
+        case 'clear':
+          svg = `<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="16" fill="#FFD600"><animate attributeName="r" values="16;18;16" dur="2s" repeatCount="indefinite"/></circle></svg>`;
+          break;
+        case 'clouds':
+          svg = `<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#B0BEC5"><animate attributeName="cx" values="32;36;32" dur="2s" repeatCount="indefinite"/></ellipse></svg>`;
+          break;
+        case 'rain':
+          svg = `<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#90CAF9"/><line x1="24" y1="50" x2="24" y2="60" stroke="#2196F3" stroke-width="3"><animate attributeName="y2" values="60;64;60" dur="1s" repeatCount="indefinite"/></line><line x1="40" y1="50" x2="40" y2="60" stroke="#2196F3" stroke-width="3"><animate attributeName="y2" values="60;64;60" dur="1s" repeatCount="indefinite"/></line></svg>`;
+          break;
+        case 'thunderstorm':
+          svg = `<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#B0BEC5"/><polygon points="30,50 36,50 32,60" fill="#FFD600"><animate attributeName="points" values="30,50 36,50 32,60;32,52 38,52 34,62;30,50 36,50 32,60" dur="1.5s" repeatCount="indefinite"/></polygon></svg>`;
+          break;
+        case 'snow':
+          svg = `<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#E3F2FD"/><circle cx="32" cy="54" r="4" fill="#90CAF9"><animate attributeName="cy" values="54;60;54" dur="2s" repeatCount="indefinite"/></circle></svg>`;
+          break;
+        case 'mist':
+        case 'fog':
+          svg = `<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#B0BEC5"/><rect x="16" y="48" width="32" height="6" fill="#CFD8DC"><animate attributeName="y" values="48;52;48" dur="2s" repeatCount="indefinite"/></rect></svg>`;
+          break;
+        default:
+          svg = `<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="16" fill="#FFD600"/></svg>`;
+      }
+      iconDiv.innerHTML = svg;
+    }
+
+    // --- Patch weather.js to use loader, toast, and animated icon ---
+    const origFetchWeatherAndForecast = window.fetchWeatherAndForecast;
+    window.fetchWeatherAndForecast = function(lat, lon) {
+      showLoader(true);
+      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('weatherMain').textContent = data.weather[0].main;
+          document.getElementById('weatherTemp').textContent = Math.round(data.main.temp) + "°C";
+          document.getElementById('realFeel').textContent = Math.round(data.main.feels_like) + "°";
+          document.getElementById('windSpeed').textContent = data.wind.speed + " km/hr";
+          document.getElementById('weatherDate').textContent = formatDate(data.dt);
+          fetchGif(data.weather[0].main);
+          setAnimatedWeatherIcon(data.weather[0].main);
+          showLoader(false);
+          fetchForecast(lat, lon);
+        })
+        .catch(() => {
+          showLoader(false);
+          showToast('Failed to fetch weather data', 'error');
+        });
+    };
+    // Patch city fetch as well
+    const origFetchWeatherByCityAndForecast = window.fetchWeatherByCityAndForecast;
+    window.fetchWeatherByCityAndForecast = function(city) {
+      showLoader(true);
+      fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${OPENWEATHER_API_KEY}&units=metric`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('weatherMain').textContent = data.weather[0].main;
+          document.getElementById('weatherTemp').textContent = Math.round(data.main.temp) + "°C";
+          document.getElementById('realFeel').textContent = Math.round(data.main.feels_like) + "°";
+          document.getElementById('windSpeed').textContent = data.wind.speed + " km/hr";
+          document.getElementById('weatherDate').textContent = formatDate(data.dt);
+          fetchGif(data.weather[0].main);
+          setAnimatedWeatherIcon(data.weather[0].main);
+          showLoader(false);
+          fetchForecastByCity(city);
+        })
+        .catch(() => {
+          showLoader(false);
+          showToast('Failed to fetch weather data', 'error');
+        });
+    };
+
+    // --- Fun Fact Card logic ---
+    const funFacts = [
+      "Did you know? The highest temperature ever recorded on Earth was 56.7°C (134°F) in Death Valley, USA.",
+      "Raindrops can fall at speeds of about 22 miles per hour!",
+      "Snowflakes always have six sides.",
+      "The coldest temperature ever recorded was -89.2°C (-128.6°F) in Antarctica.",
+      "A bolt of lightning is five times hotter than the surface of the sun.",
+      "The wettest place on Earth is Mawsynram, India, with 11,871mm of rain a year.",
+      "Hurricanes can release energy equivalent to 10 atomic bombs per second.",
+      "The fastest wind speed ever recorded was 253 mph during Tropical Cyclone Olivia.",
+      "The Sahara Desert can reach freezing temperatures at night.",
+      "Fog is actually a cloud that touches the ground."
+    ];
+    function setRandomFunFact() {
+      const fact = funFacts[Math.floor(Math.random() * funFacts.length)];
+      document.getElementById('funFactText').textContent = fact;
+    }
+    document.addEventListener('DOMContentLoaded', setRandomFunFact);
+    document.getElementById('funFactCard').onclick = setRandomFunFact;
+
+    // Refresh Weather Button
+    document.getElementById('refreshWeatherBtn').onclick = function() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          fetchWeatherAndForecast(pos.coords.latitude, pos.coords.longitude);
+        });
+      }
+    };
+    // Remove old prompt-based change location logic
+    // The inline search box now handles location changes
+
+    // --- Weather Alerts Card Logic ---
+    function showWeatherAlertCard(alerts) {
+      const card = document.getElementById('weatherAlertCard');
+      const content = document.getElementById('weatherAlertContent');
+      if (alerts && alerts.length > 0) {
+        card.style.display = '';
+        const alert = alerts[0]; // Show the first alert
+        content.innerHTML = `
+          <div class="fw-bold mb-1">${alert.event || 'Alert'}</div>
+          <div class="mb-1">${alert.description ? alert.description.replace(/\n/g, '<br>') : ''}</div>
+          <div class="small text-muted">${alert.sender_name ? 'Source: ' + alert.sender_name + ' | ' : ''}From: ${new Date(alert.start * 1000).toLocaleString()}<br>To: ${new Date(alert.end * 1000).toLocaleString()}</div>
+        `;
+      } else {
+        card.style.display = '';
+        content.innerHTML = '<span class="text-success">No weather alerts for your area.</span>';
+      }
+    }
+    // Fetch alerts after getting location
+    function fetchWeatherAlerts(lat, lon) {
+      fetch(`https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric`)
+        .then(res => res.json())
+        .then(data => {
+          showWeatherAlertCard(data.alerts || []);
+        })
+        .catch(() => {
+          showWeatherAlertCard([]);
+        });
+    }
+    // Patch geolocation logic to fetch alerts
+    document.addEventListener('DOMContentLoaded', () => {
+      initTranslation();
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+
+          getLocationName(lat, lon, function(name) {
+            if (name) {
+              const el = document.getElementById('locationName');
+              el.textContent = name;
+              el.dataset.original = name;
+              translateText(name, document.getElementById('languageSelect').value, translated => {
+                el.textContent = translated;
+              });
+            }
+          });
+
+          fetchWeatherAndForecast(lat, lon);
+          fetchAllCapitalsWeather();
+          fetchWeatherAlerts(lat, lon);
+
+          fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric`)
+            .then(res => res.json())
+            .then(data => {
+              fetchGif(data.weather[0].main);
+              const el = document.getElementById('weatherMain');
+              el.textContent = data.weather[0].description;
+              el.dataset.original = data.weather[0].description;
+              translateText(data.weather[0].description, document.getElementById('languageSelect').value, translated => {
+                el.textContent = translated;
+              });
+            });
+        }, function() {
+          const el = document.getElementById('locationName');
+          el.textContent = "Terengganu";
+          el.dataset.original = "Terengganu";
+          translateText("Terengganu", document.getElementById('languageSelect').value, translated => {
+            el.textContent = translated;
+          });
+          fetchWeatherByCityAndForecast("Terengganu");
+          fetchAllCapitalsWeather();
+          fetchWeatherAlerts(5.3302, 103.1408);
+          fetch(`https://api.openweathermap.org/data/2.5/weather?q=Terengganu&appid=${OPENWEATHER_API_KEY}&units=metric`)
+            .then(res => res.json())
+            .then(data => {
+              fetchGif(data.weather[0].main);
+            });
+        });
+      } else {
+        const el = document.getElementById('locationName');
+        el.textContent = "Terengganu";
+        el.dataset.original = "Terengganu";
+        translateText("Terengganu", document.getElementById('languageSelect').value, translated => {
+          el.textContent = translated;
+        });
+        fetchWeatherByCityAndForecast("Terengganu");
+        fetchAllCapitalsWeather();
+        fetchWeatherAlerts(5.3302, 103.1408);
+        fetch(`https://api.openweathermap.org/data/2.5/weather?q=Terengganu&appid=${OPENWEATHER_API_KEY}&units=metric`)
+          .then(res => res.json())
+          .then(data => {
+            fetchGif(data.weather[0].main);
+          });
+      }
+    });
+  </script>
+</body>
+</html>
