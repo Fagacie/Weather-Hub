@@ -1,4 +1,14 @@
-const OPENWEATHER_API_KEY = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.OPENWEATHER_API_KEY) || "";
+const WEATHER_API_BASE_URL = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.WEATHER_API_BASE_URL) || '/api';
+
+function buildWeatherApiUrl(endpoint, params) {
+  const query = new URLSearchParams(params);
+  const base = WEATHER_API_BASE_URL.replace(/\/$/, '');
+  return base + endpoint + '?' + query.toString();
+}
+
+function fetchWeatherApi(endpoint, params) {
+  return fetch(buildWeatherApiUrl(endpoint, params)).then(parseWeatherResponse);
+}
 
 function formatDate(dt) {
   return new Date(dt * 1000).toLocaleDateString(undefined, {weekday:'long', day:'2-digit', month:'short', year:'numeric'});
@@ -181,13 +191,8 @@ function setLocationName(name) {
 
 // --- Main Weather + Forecast ---
 function fetchWeatherAndForecast(lat, lon) {
-  if (!OPENWEATHER_API_KEY) {
-    handleWeatherError('OpenWeather API key is not configured.');
-    return;
-  }
   if (typeof showLoader === 'function') showLoader(true);
-  fetch('https://api.openweathermap.org/data/2.5/weather?lat=' + lat + '&lon=' + lon + '&appid=' + OPENWEATHER_API_KEY + '&units=metric')
-    .then(parseWeatherResponse)
+  fetchWeatherApi('/weather', { lat: lat, lon: lon })
     .then(function(data) {
       displayWeatherData(data);
       if (typeof showLoader === 'function') showLoader(false);
@@ -199,13 +204,8 @@ function fetchWeatherAndForecast(lat, lon) {
 }
 
 function fetchWeatherByCityAndForecast(city) {
-  if (!OPENWEATHER_API_KEY) {
-    handleWeatherError('OpenWeather API key is not configured.');
-    return;
-  }
   if (typeof showLoader === 'function') showLoader(true);
-  fetch('https://api.openweathermap.org/data/2.5/weather?q=' + encodeURIComponent(city) + '&appid=' + OPENWEATHER_API_KEY + '&units=metric')
-    .then(parseWeatherResponse)
+  fetchWeatherApi('/weather', { city: city })
     .then(function(data) {
       displayWeatherData(data);
       if (typeof showLoader === 'function') showLoader(false);
@@ -217,11 +217,7 @@ function fetchWeatherByCityAndForecast(city) {
 }
 
 function fetchForecast(lat, lon) {
-  fetch('https://api.openweathermap.org/data/2.5/forecast?lat=' + lat + '&lon=' + lon + '&appid=' + OPENWEATHER_API_KEY + '&units=metric')
-    .then(function(res) {
-      if (!res.ok) throw new Error('Forecast unavailable');
-      return res.json();
-    })
+  fetchWeatherApi('/forecast', { lat: lat, lon: lon })
     .then(function(data) {
       renderForecast(data);
     })
@@ -231,11 +227,7 @@ function fetchForecast(lat, lon) {
 }
 
 function fetchForecastByCity(city) {
-  fetch('https://api.openweathermap.org/data/2.5/forecast?q=' + encodeURIComponent(city) + '&appid=' + OPENWEATHER_API_KEY + '&units=metric')
-    .then(function(res) {
-      if (!res.ok) throw new Error('Forecast unavailable');
-      return res.json();
-    })
+  fetchWeatherApi('/forecast', { city: city })
     .then(function(data) {
       renderForecast(data);
     })
@@ -311,10 +303,6 @@ function fetchAllCapitalsWeather(page, perPage, searchTerm) {
   const container = document.getElementById('nearbyPlaces');
   container.innerHTML = '<div class="w-100 text-center py-3">Loading world capitals weather...</div>';
   document.getElementById('capitalsCount').textContent = '';
-  if (!OPENWEATHER_API_KEY) {
-    container.innerHTML = '<div class="w-100 text-center py-3 text-danger">OpenWeather API key is not configured.</div>';
-    return;
-  }
 
   if (allCapitals.length === 0) {
     fetch('https://restcountries.com/v3.1/all?fields=capital,latlng,name')
@@ -395,8 +383,7 @@ function renderCapitals(page, perPage, searchTerm) {
       weatherDiv.innerHTML = Math.round(weather.main.temp) + '°C, ' + weather.weather[0].main +
         ' <img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="32">';
     } else {
-      fetch('https://api.openweathermap.org/data/2.5/weather?lat=' + lat + '&lon=' + lon + '&appid=' + OPENWEATHER_API_KEY + '&units=metric')
-        .then(parseWeatherResponse)
+      fetchWeatherApi('/weather', { lat: lat, lon: lon })
         .then(function(weather) {
           capitalsWeatherCache[cacheKey] = weather;
           weatherDiv.innerHTML = Math.round(weather.main.temp) + '°C, ' + weather.weather[0].main +
@@ -461,8 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function showCapitalDetails(capital, country, lat, lon) {
-  fetch('https://api.openweathermap.org/data/2.5/weather?lat=' + lat + '&lon=' + lon + '&appid=' + OPENWEATHER_API_KEY + '&units=metric')
-    .then(parseWeatherResponse)
+  fetchWeatherApi('/weather', { lat: lat, lon: lon })
     .then(function(weather) {
       const html =
         '<h5>' + capital + ', ' + country + '</h5>' +

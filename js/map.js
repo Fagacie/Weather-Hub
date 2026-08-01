@@ -1,5 +1,11 @@
-const OPENWEATHER_API_KEY = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.OPENWEATHER_API_KEY) || "";
+const WEATHER_API_BASE_URL = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.WEATHER_API_BASE_URL) || '/api';
 const GOOGLE_MAPS_API_KEY = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.GOOGLE_MAPS_API_KEY) || "";
+
+function buildWeatherApiUrl(endpoint, params) {
+  const query = new URLSearchParams(params);
+  const base = WEATHER_API_BASE_URL.replace(/\/$/, '');
+  return base + endpoint + '?' + query.toString();
+}
 
 let map, marker, infowindow;
 
@@ -68,13 +74,7 @@ function placeMarker(location) {
 }
 
 function fetchWeather(lat, lon, displayName) {
-  if (!OPENWEATHER_API_KEY) {
-    infowindow.setContent('<div class="weather-popup text-danger">OpenWeather API key is not configured.</div>');
-    infowindow.open(map, marker);
-    return;
-  }
-
-  fetch('https://api.openweathermap.org/data/2.5/weather?lat=' + lat + '&lon=' + lon + '&appid=' + OPENWEATHER_API_KEY + '&units=metric')
+  fetch(buildWeatherApiUrl('/weather', { lat: lat, lon: lon }))
     .then(function(res) {
       return res.json().then(function(data) {
         if (!res.ok || (data.cod && Number(data.cod) !== 200)) {

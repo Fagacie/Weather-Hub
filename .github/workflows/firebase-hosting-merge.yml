@@ -11,9 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - uses: actions/setup-node@v4
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WEATHER_HUB_9C3F8 }}
-          channelId: live
-          projectId: weather-hub-9c3f8
+          node-version: 20
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WEATHER_HUB_9C3F8 }}
+      - run: |
+          if [ -n "$WEATHER_HUB_CONFIG_JS" ]; then
+            printf '%s' "$WEATHER_HUB_CONFIG_JS" > js/config.js
+          fi
+        env:
+          WEATHER_HUB_CONFIG_JS: ${{ secrets.WEATHER_HUB_CONFIG_JS }}
+      - run: npm install -g firebase-tools
+      - run: firebase deploy --only hosting,functions --project weather-hub-9c3f8 --non-interactive
