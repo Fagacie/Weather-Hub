@@ -37,6 +37,7 @@
   </div>
 
   <!-- Firebase & Auth JS -->
+  <script src="js/config.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="js/firebase-config.js"></script>
@@ -46,13 +47,19 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       initTranslation();
+      let isLoggingIn = false;
+      onAuthStateChanged(function(user) {
+        if (user && !isLoggingIn) window.location.href = 'index.html';
+      });
       document.getElementById('loginForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        isLoggingIn = true;
         const email = document.getElementById('loginEmail').value.trim();
         const password = document.getElementById('loginPassword').value;
         const msg = document.getElementById('loginMsg');
         loginUser(email, password, function(error) {
           if (error) {
+            isLoggingIn = false;
             msg.textContent = error.message;
             msg.classList.add('text-danger');
           } else {

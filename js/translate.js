@@ -1,6 +1,11 @@
-const GOOGLE_TRANSLATE_API_KEY = "AIzaSyA4GymxbXBaasNQd-Gl5XnztNBKs334kpM";
+const GOOGLE_TRANSLATE_API_KEY = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.GOOGLE_TRANSLATE_API_KEY) || "";
 
 function translateText(text, targetLang, callback) {
+  if (!GOOGLE_TRANSLATE_API_KEY || targetLang === 'en') {
+    callback(text);
+    return;
+  }
+
   if (Array.isArray(text)) {
     fetch(`https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`, {
       method: "POST",
@@ -60,6 +65,10 @@ function translateAll(targetLang, callback) {
 function initTranslation() {
   const select = document.getElementById('languageSelect');
   if (!select) return;
+  if (!GOOGLE_TRANSLATE_API_KEY) {
+    select.innerHTML = '<option value="en" selected>English</option>';
+    return;
+  }
 
   fetch(`https://translation.googleapis.com/language/translate/v2/languages?key=${GOOGLE_TRANSLATE_API_KEY}&target=en`)
     .then(res => res.json())

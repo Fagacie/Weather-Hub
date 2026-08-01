@@ -64,6 +64,7 @@
       <div id="weatherFact" class="translatable"></div>
     </div>
   </div>
+  <script src="js/config.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -108,9 +109,7 @@
             phoneEl.textContent = '';
           });
         } else {
-          nameEl.textContent = 'Not logged in';
-          emailEl.textContent = '';
-          phoneEl.textContent = '';
+          window.location.href = 'login.html';
         }
       });
       // Edit Profile Modal logic
@@ -126,7 +125,7 @@
         const phone = document.getElementById('editPhone').value.trim();
         const msg = document.getElementById('editProfileMsg');
         msg.textContent = 'Saving...';
-        firebase.database().ref('users/' + user.uid).update({ username, phoneno: phone })
+        firebase.database().ref('users/' + user.uid).update({ username: username, phone: phone, phoneno: null })
           .then(() => {
             msg.textContent = 'Profile updated!';
             msg.className = 'text-success text-center mt-2';

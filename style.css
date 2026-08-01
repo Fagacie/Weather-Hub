@@ -3,6 +3,43 @@ body {
     min-height: 100vh;
     background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
     background-attachment: fixed;
+    transition: background 0.6s ease;
+}
+
+/* Weather-based backgrounds (replaces Giphy) */
+body.weather-clear {
+    background: linear-gradient(135deg, #fceabb 0%, #f8b500 50%, #74ebd5 100%);
+}
+body.weather-clouds {
+    background: linear-gradient(135deg, #bdc3c7 0%, #8e9eab 50%, #eef2f3 100%);
+}
+body.weather-rain {
+    background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+}
+body.weather-thunderstorm {
+    background: linear-gradient(135deg, #373b44 0%, #4286f4 100%);
+}
+body.weather-snow {
+    background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+}
+body.weather-mist {
+    background: linear-gradient(135deg, #cfd9df 0%, #e2ebf0 100%);
+}
+body.dark-mode.weather-clear {
+    background: linear-gradient(135deg, #3d3200 0%, #232526 100%);
+}
+body.dark-mode.weather-clouds {
+    background: linear-gradient(135deg, #434343 0%, #232526 100%);
+}
+body.dark-mode.weather-rain,
+body.dark-mode.weather-thunderstorm {
+    background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+}
+body.dark-mode.weather-snow {
+    background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%);
+}
+body.dark-mode.weather-mist {
+    background: linear-gradient(135deg, #373b44 0%, #4286f4 100%);
 }
 
 /* Frosted glass effect for cards and navbar */

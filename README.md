@@ -16,6 +16,13 @@ Users need quick and accurate access to weather information for planning daily a
 - API integration
 - User-friendly interface
 
+## Local Configuration
+API keys are loaded from `js/config.js`, which is ignored by git so secrets are not committed.
+
+1. Copy `js/config.example.js` to `js/config.js`.
+2. Fill in your OpenWeather, Google Maps, Google Translate, and Firebase project values.
+3. Open `index.html` locally or deploy with your own `js/config.js` supplied in the hosting environment.
+
 ## System Workflow
 User inputs location → API fetches weather data → system processes data → UI displays results.
 

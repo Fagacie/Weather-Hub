@@ -1,5 +1,13 @@
+function isFirebaseReady() {
+  return typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0;
+}
+
 // Register a new user
 function registerUser(email, password, username, phone, callback) {
+  if (!isFirebaseReady()) {
+    callback(new Error('Firebase config is not configured.'));
+    return;
+  }
   firebase.auth().createUserWithEmailAndPassword(email, password)
     .then(userCredential => {
       const user = userCredential.user;
@@ -17,6 +25,10 @@ function registerUser(email, password, username, phone, callback) {
 
 // Login user
 function loginUser(email, password, callback) {
+  if (!isFirebaseReady()) {
+    callback(new Error('Firebase config is not configured.'));
+    return;
+  }
   firebase.auth().signInWithEmailAndPassword(email, password)
     .then(() => callback(null))
     .catch(error => callback(error));
@@ -24,6 +36,10 @@ function loginUser(email, password, callback) {
 
 // Logout user
 function logoutUser(callback) {
+  if (!isFirebaseReady()) {
+    callback(new Error('Firebase config is not configured.'));
+    return;
+  }
   firebase.auth().signOut()
     .then(() => callback(null))
     .catch(error => callback(error));
@@ -31,10 +47,15 @@ function logoutUser(callback) {
 
 // Listen for auth state changes
 function onAuthStateChanged(callback) {
+  if (!isFirebaseReady()) {
+    callback(null);
+    return;
+  }
   firebase.auth().onAuthStateChanged(callback);
 }
 
 // Get current user
 function getCurrentUser() {
+  if (!isFirebaseReady()) return null;
   return firebase.auth().currentUser;
 }
