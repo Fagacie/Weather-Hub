@@ -41,26 +41,28 @@ function setAnimatedWeatherIcon(weather) {
   let svg = '';
   switch ((weather || '').toLowerCase()) {
     case 'clear':
-      svg = '<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="16" fill="#FFD600"><animate attributeName="r" values="16;18;16" dur="2s" repeatCount="indefinite"/></circle></svg>';
+      svg = '<svg width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="18" fill="#FBBF24" opacity="0.9"><animate attributeName="r" values="18;20;18" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="40" cy="40" r="26" fill="none" stroke="#FBBF24" stroke-width="1.5" opacity="0.3"><animate attributeName="r" values="26;30;26" dur="3s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0.1;0.3" dur="3s" repeatCount="indefinite"/></circle></svg>';
       break;
     case 'clouds':
-      svg = '<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#B0BEC5"><animate attributeName="cx" values="32;36;32" dur="2s" repeatCount="indefinite"/></ellipse></svg>';
+      svg = '<svg width="80" height="80" viewBox="0 0 80 80"><ellipse cx="32" cy="44" rx="20" ry="12" fill="rgba(255,255,255,0.25)"><animate attributeName="cx" values="32;36;32" dur="3s" repeatCount="indefinite"/></ellipse><ellipse cx="44" cy="40" rx="16" ry="10" fill="rgba(255,255,255,0.18)"><animate attributeName="cx" values="44;40;44" dur="4s" repeatCount="indefinite"/></ellipse></svg>';
       break;
     case 'rain':
-      svg = '<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#90CAF9"/><line x1="24" y1="50" x2="24" y2="60" stroke="#2196F3" stroke-width="3"><animate attributeName="y2" values="60;64;60" dur="1s" repeatCount="indefinite"/></line><line x1="40" y1="50" x2="40" y2="60" stroke="#2196F3" stroke-width="3"><animate attributeName="y2" values="60;64;60" dur="1s" repeatCount="indefinite"/></line></svg>';
+    case 'drizzle':
+      svg = '<svg width="80" height="80" viewBox="0 0 80 80"><ellipse cx="40" cy="36" rx="20" ry="12" fill="rgba(255,255,255,0.2)"/><line x1="28" y1="52" x2="26" y2="62" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" opacity="0.7"><animate attributeName="y1" values="52;56;52" dur="0.8s" repeatCount="indefinite"/><animate attributeName="y2" values="62;66;62" dur="0.8s" repeatCount="indefinite"/></line><line x1="40" y1="50" x2="38" y2="62" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" opacity="0.5"><animate attributeName="y1" values="50;54;50" dur="1s" repeatCount="indefinite"/><animate attributeName="y2" values="62;66;62" dur="1s" repeatCount="indefinite"/></line><line x1="52" y1="52" x2="50" y2="60" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" opacity="0.6"><animate attributeName="y1" values="52;56;52" dur="0.9s" repeatCount="indefinite"/><animate attributeName="y2" values="60;64;60" dur="0.9s" repeatCount="indefinite"/></line></svg>';
       break;
     case 'thunderstorm':
-      svg = '<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#B0BEC5"/><polygon points="30,50 36,50 32,60" fill="#FFD600"><animate attributeName="points" values="30,50 36,50 32,60;32,52 38,52 34,62;30,50 36,50 32,60" dur="1.5s" repeatCount="indefinite"/></polygon></svg>';
+      svg = '<svg width="80" height="80" viewBox="0 0 80 80"><ellipse cx="40" cy="36" rx="22" ry="12" fill="rgba(255,255,255,0.15)"/><polygon points="38,48 44,48 40,58 46,58 36,72 40,60 34,60" fill="#FBBF24"><animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/></polygon></svg>';
       break;
     case 'snow':
-      svg = '<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#E3F2FD"/><circle cx="32" cy="54" r="4" fill="#90CAF9"><animate attributeName="cy" values="54;60;54" dur="2s" repeatCount="indefinite"/></circle></svg>';
+      svg = '<svg width="80" height="80" viewBox="0 0 80 80"><ellipse cx="40" cy="36" rx="20" ry="12" fill="rgba(255,255,255,0.25)"/><circle cx="30" cy="56" r="3" fill="rgba(255,255,255,0.6)"><animate attributeName="cy" values="56;64;56" dur="2s" repeatCount="indefinite"/></circle><circle cx="40" cy="52" r="2.5" fill="rgba(255,255,255,0.5)"><animate attributeName="cy" values="52;62;52" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="50" cy="54" r="3" fill="rgba(255,255,255,0.6)"><animate attributeName="cy" values="54;66;54" dur="1.8s" repeatCount="indefinite"/></circle></svg>';
       break;
     case 'mist':
     case 'fog':
-      svg = '<svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="18" ry="10" fill="#B0BEC5"/><rect x="16" y="48" width="32" height="6" fill="#CFD8DC"><animate attributeName="y" values="48;52;48" dur="2s" repeatCount="indefinite"/></rect></svg>';
+    case 'haze':
+      svg = '<svg width="80" height="80" viewBox="0 0 80 80"><rect x="16" y="34" width="48" height="4" rx="2" fill="rgba(255,255,255,0.2)"><animate attributeName="x" values="16;20;16" dur="3s" repeatCount="indefinite"/></rect><rect x="20" y="44" width="40" height="4" rx="2" fill="rgba(255,255,255,0.15)"><animate attributeName="x" values="20;16;20" dur="4s" repeatCount="indefinite"/></rect><rect x="18" y="54" width="44" height="4" rx="2" fill="rgba(255,255,255,0.1)"><animate attributeName="x" values="18;22;18" dur="3.5s" repeatCount="indefinite"/></rect></svg>';
       break;
     default:
-      svg = '<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="16" fill="#FFD600"/></svg>';
+      svg = '<svg width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="18" fill="#FBBF24" opacity="0.8"/></svg>';
   }
   iconDiv.innerHTML = svg;
 }
@@ -118,12 +120,12 @@ function checkSevereWeatherAlerts(data) {
     card.style.display = '';
     const alert = alerts[0];
     content.innerHTML =
-      '<div class="fw-bold mb-1">' + alert.event + '</div>' +
-      '<div class="mb-1">' + alert.description + '</div>' +
-      '<div class="small text-muted">Detected at ' + new Date(alert.start * 1000).toLocaleString() + '</div>';
+      '<div style="font-weight:600;margin-bottom:0.375rem;">' + alert.event + '</div>' +
+      '<div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.25rem;">' + alert.description + '</div>' +
+      '<div style="font-size:0.75rem;color:var(--text-muted);">Detected at ' + new Date(alert.start * 1000).toLocaleString() + '</div>';
   } else {
     card.style.display = '';
-    content.innerHTML = '<span class="text-success">No severe weather conditions detected for your area.</span>';
+    content.innerHTML = '<span style="color:#34d399;font-size:0.85rem;">No severe weather conditions detected for your area.</span>';
   }
 }
 
@@ -136,16 +138,26 @@ function displayWeatherData(data) {
   mainEl.textContent = displayDesc;
   mainEl.dataset.original = displayDesc;
   document.getElementById('weatherTemp').textContent = Math.round(data.main.temp) + '°C';
-  document.getElementById('realFeel').textContent = Math.round(data.main.feels_like) + '°';
-  document.getElementById('windSpeed').textContent = formatWindSpeed(data.wind.speed);
+
+  // Update stat pills
+  var realFeel = Math.round(data.main.feels_like) + '°';
+  var windStr = formatWindSpeed(data.wind.speed);
+  document.getElementById('realFeel').textContent = realFeel;
+  document.getElementById('windSpeed').textContent = windStr;
   document.getElementById('weatherDate').textContent = formatDate(data.dt);
+
+  // Also update the "Now" tab if those elements exist
+  var realFeelTab = document.getElementById('realFeelTab');
+  var windSpeedTab = document.getElementById('windSpeedTab');
+  if (realFeelTab) realFeelTab.textContent = realFeel;
+  if (windSpeedTab) windSpeedTab.textContent = windStr;
 
   setWeatherBackground(main);
   setAnimatedWeatherIcon(main);
   checkSevereWeatherAlerts(data);
 
   if (typeof translateText === 'function') {
-    const langSelect = document.getElementById('languageSelect');
+    var langSelect = document.getElementById('languageSelect');
     if (langSelect) {
       translateText(displayDesc, langSelect.value, function(translated) {
         mainEl.textContent = translated;
@@ -175,12 +187,12 @@ function getLocationName(lat, lon, callback) {
 
 function setLocationName(name) {
   if (!name) return;
-  const el = document.getElementById('locationName');
+  var el = document.getElementById('locationName');
   if (!el) return;
   el.textContent = name;
   el.dataset.original = name;
   if (typeof translateText === 'function') {
-    const langSelect = document.getElementById('languageSelect');
+    var langSelect = document.getElementById('languageSelect');
     if (langSelect) {
       translateText(name, langSelect.value, function(translated) {
         el.textContent = translated;
@@ -237,40 +249,54 @@ function fetchForecastByCity(city) {
 }
 
 function renderForecast(data) {
-  let hourlyHtml = '';
+  // --- Hourly forecast (glass cards) ---
+  var hourlyHtml = '';
   data.list.slice(0, 8).forEach(function(item) {
     hourlyHtml +=
-      '<div class="text-center">' +
-      '<div>' + new Date(item.dt_txt).getHours() + ':00</div>' +
-      '<img src="https://openweathermap.org/img/wn/' + item.weather[0].icon + '.png" width="40">' +
-      '<div>' + Math.round(item.main.temp) + '°C</div>' +
+      '<div class="hourly-item">' +
+      '<div class="hour">' + new Date(item.dt_txt).getHours() + ':00</div>' +
+      '<img src="https://openweathermap.org/img/wn/' + item.weather[0].icon + '.png" width="36" alt="' + item.weather[0].main + '">' +
+      '<div class="temp">' + Math.round(item.main.temp) + '°C</div>' +
       '</div>';
   });
   document.getElementById('hourlyForecast').innerHTML = hourlyHtml;
 
-  let forecastIcons = '';
-  const days = {};
+  // --- 5-day forecast (list items) ---
+  var dailyHtml = '';
+  var days = {};
   data.list.forEach(function(item) {
-    const date = item.dt_txt.split(' ')[0];
-    const hour = item.dt_txt.split(' ')[1];
+    var date = item.dt_txt.split(' ')[0];
+    var hour = item.dt_txt.split(' ')[1];
     if (hour === '12:00:00' && !days[date]) {
       days[date] = item;
     }
   });
   Object.values(days).slice(0, 5).forEach(function(item) {
-    forecastIcons += '<img src="https://openweathermap.org/img/wn/' + item.weather[0].icon + '.png" width="32" title="' + item.weather[0].main + '">';
+    var dayName = new Date(item.dt_txt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    dailyHtml +=
+      '<div class="daily-item">' +
+      '<span class="day-name">' + dayName + '</span>' +
+      '<img src="https://openweathermap.org/img/wn/' + item.weather[0].icon + '.png" width="32" alt="' + item.weather[0].main + '">' +
+      '<span class="day-desc">' + item.weather[0].main + '</span>' +
+      '<span class="day-temp">' + Math.round(item.main.temp) + '°C</span>' +
+      '</div>';
   });
-  document.getElementById('forecastIcons').innerHTML = forecastIcons;
+  document.getElementById('forecastIcons').innerHTML = dailyHtml;
 
+  // --- Rain chance ---
   if (data.list && data.list.length) {
-    const chanceOfRain = data.list[0].pop !== undefined ? Math.round(data.list[0].pop * 100) + '%' : '--';
+    var chanceOfRain = data.list[0].pop !== undefined ? Math.round(data.list[0].pop * 100) + '%' : '--';
     document.getElementById('rainChance').textContent = chanceOfRain;
+    var rainChanceTab = document.getElementById('rainChanceTab');
+    if (rainChanceTab) rainChanceTab.textContent = chanceOfRain;
   }
   document.getElementById('uvIndex').textContent = '--';
+  var uvIndexTab = document.getElementById('uvIndexTab');
+  if (uvIndexTab) uvIndexTab.textContent = '--';
 }
 
 function loadHomeWeather() {
-  const fallback = function() {
+  var fallback = function() {
     setLocationName('Terengganu');
     fetchWeatherByCityAndForecast('Terengganu');
     fetchAllCapitalsWeather();
@@ -282,8 +308,8 @@ function loadHomeWeather() {
   }
 
   navigator.geolocation.getCurrentPosition(function(pos) {
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
+    var lat = pos.coords.latitude;
+    var lon = pos.coords.longitude;
     getLocationName(lat, lon, setLocationName);
     fetchWeatherAndForecast(lat, lon);
     fetchAllCapitalsWeather();
@@ -291,17 +317,17 @@ function loadHomeWeather() {
 }
 
 // --- Capitals Weather with Search, Pagination, and Modal ---
-let allCapitals = [];
-let capitalsWeatherCache = {};
-let searchTimeout = null;
+var allCapitals = [];
+var capitalsWeatherCache = {};
+var searchTimeout = null;
 
 function fetchAllCapitalsWeather(page, perPage, searchTerm) {
   page = page || 1;
   perPage = perPage || 6;
   searchTerm = searchTerm || '';
 
-  const container = document.getElementById('nearbyPlaces');
-  container.innerHTML = '<div class="w-100 text-center py-3">Loading world capitals weather...</div>';
+  var container = document.getElementById('nearbyPlaces');
+  container.innerHTML = '<div style="width:100%;text-align:center;padding:1.5rem 0;color:var(--text-muted);font-size:0.85rem;">Loading world capitals weather...</div>';
   document.getElementById('capitalsCount').textContent = '';
 
   if (allCapitals.length === 0) {
@@ -317,7 +343,7 @@ function fetchAllCapitalsWeather(page, perPage, searchTerm) {
         renderCapitals(page, perPage, searchTerm);
       })
       .catch(function() {
-        container.innerHTML = '<div class="w-100 text-center py-3 text-danger">Failed to load capitals data.</div>';
+        container.innerHTML = '<div style="width:100%;text-align:center;padding:1.5rem 0;color:#f87171;font-size:0.85rem;">Failed to load capitals data.</div>';
       });
   } else {
     renderCapitals(page, perPage, searchTerm);
@@ -325,72 +351,70 @@ function fetchAllCapitalsWeather(page, perPage, searchTerm) {
 }
 
 function renderCapitals(page, perPage, searchTerm) {
-  const container = document.getElementById('nearbyPlaces');
-  let filtered = allCapitals;
+  var container = document.getElementById('nearbyPlaces');
+  var filtered = allCapitals;
   if (searchTerm) {
-    const term = searchTerm.toLowerCase();
+    var term = searchTerm.toLowerCase();
     filtered = allCapitals.filter(function(c) {
       return c.capital[0].toLowerCase().includes(term) || c.name.common.toLowerCase().includes(term);
     });
   }
-  const totalCapitals = filtered.length;
-  const start = (page - 1) * perPage;
-  const end = start + perPage;
-  let shown = 0;
-  let html = '';
+  var totalCapitals = filtered.length;
+  var start = (page - 1) * perPage;
+  var end = start + perPage;
+  var shown = 0;
+  var html = '';
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="w-100 text-center py-3 text-muted">No results found.</div>';
+    container.innerHTML = '<div style="width:100%;text-align:center;padding:1.5rem 0;color:var(--text-muted);font-size:0.85rem;">No results found.</div>';
     document.getElementById('capitalsCount').textContent = '';
     return;
   }
 
-  html += '<div class="horizontal-scroll">';
   filtered.slice(start, end).forEach(function(country) {
-    const lat = country.latlng[0];
-    const lon = country.latlng[1];
-    const capital = country.capital[0];
-    const countryName = country.name.common;
-    const cacheKey = capital + ',' + countryName;
+    var lat = country.latlng[0];
+    var lon = country.latlng[1];
+    var capital = country.capital[0];
+    var countryName = country.name.common;
+    var cacheKey = capital + ',' + countryName;
     html +=
-      '<div class="frosted nearby-card p-2 text-center capital-card mx-1"' +
+      '<div class="capital-card frosted nearby-card"' +
       ' data-capital="' + capital + '"' +
       ' data-country="' + countryName + '"' +
       ' data-lat="' + lat + '"' +
       ' data-lon="' + lon + '">' +
-      '<div class="fw-bold">' + capital + ', ' + countryName + '</div>' +
+      '<div class="capital-name">' + capital + ', ' + countryName + '</div>' +
       '<div class="capital-weather" id="capitalWeather-' + cacheKey.replace(/\s/g, '_') + '">Loading...</div>' +
-      '<div class="mt-2">' +
-      '<a href="map.html?lat=' + lat + '&lon=' + lon + '&name=' + encodeURIComponent(capital + ', ' + countryName) + '" class="btn btn-sm btn-outline-success">' +
-      '<i class="bi bi-geo-alt"></i> View on Map</a>' +
+      '<div style="margin-top:0.625rem;">' +
+      '<a href="map.html?lat=' + lat + '&lon=' + lon + '&name=' + encodeURIComponent(capital + ', ' + countryName) + '" class="map-link">' +
+      '<i class="bi bi-geo-alt-fill"></i> View on Map</a>' +
       '</div></div>';
     shown++;
   });
-  html += '</div>';
   container.innerHTML = html;
-  document.getElementById('capitalsCount').textContent = 'Showing ' + (start + shown) + ' of ' + totalCapitals + ' capitals';
+  document.getElementById('capitalsCount').textContent = 'Showing ' + (start + shown) + ' of ' + totalCapitals;
 
   filtered.slice(start, end).forEach(function(country) {
-    const lat = country.latlng[0];
-    const lon = country.latlng[1];
-    const capital = country.capital[0];
-    const countryName = country.name.common;
-    const cacheKey = capital + ',' + countryName;
-    const weatherDiv = document.getElementById('capitalWeather-' + cacheKey.replace(/\s/g, '_'));
+    var lat = country.latlng[0];
+    var lon = country.latlng[1];
+    var capital = country.capital[0];
+    var countryName = country.name.common;
+    var cacheKey = capital + ',' + countryName;
+    var weatherDiv = document.getElementById('capitalWeather-' + cacheKey.replace(/\s/g, '_'));
 
     if (capitalsWeatherCache[cacheKey]) {
-      const weather = capitalsWeatherCache[cacheKey];
+      var weather = capitalsWeatherCache[cacheKey];
       weatherDiv.innerHTML = Math.round(weather.main.temp) + '°C, ' + weather.weather[0].main +
-        ' <img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="32">';
+        ' <img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="28" alt="' + weather.weather[0].main + '" style="vertical-align:middle;">';
     } else {
       fetchWeatherApi('/weather', { lat: lat, lon: lon })
         .then(function(weather) {
           capitalsWeatherCache[cacheKey] = weather;
           weatherDiv.innerHTML = Math.round(weather.main.temp) + '°C, ' + weather.weather[0].main +
-            ' <img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="32">';
+            ' <img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="28" alt="' + weather.weather[0].main + '" style="vertical-align:middle;">';
         })
         .catch(function() {
-          weatherDiv.innerHTML = '<span class="text-danger">Failed to load</span>';
+          weatherDiv.innerHTML = '<span style="color:#f87171;">Failed to load</span>';
         });
     }
   });
@@ -398,7 +422,7 @@ function renderCapitals(page, perPage, searchTerm) {
   setTimeout(function() {
     document.querySelectorAll('.capital-card').forEach(function(card) {
       card.onclick = function(e) {
-        if (e.target.tagName === 'A') return;
+        if (e.target.tagName === 'A' || e.target.closest('a')) return;
         showCapitalDetails(card.dataset.capital, card.dataset.country, card.dataset.lat, card.dataset.lon);
       };
     });
@@ -406,12 +430,12 @@ function renderCapitals(page, perPage, searchTerm) {
 
   if (totalCapitals > perPage) {
     setTimeout(function() {
-      let paginationHtml = '<div class="d-flex justify-content-center mt-2 gap-2">';
+      var paginationHtml = '<div class="capitals-pagination">';
       if (page > 1) {
-        paginationHtml += '<button class="btn btn-sm btn-outline-primary" id="prevCapitals">Previous</button>';
+        paginationHtml += '<button id="prevCapitals">← Previous</button>';
       }
       if (end < totalCapitals) {
-        paginationHtml += '<button class="btn btn-sm btn-outline-primary" id="nextCapitals">Next</button>';
+        paginationHtml += '<button id="nextCapitals">Next →</button>';
       }
       paginationHtml += '</div>';
       container.insertAdjacentHTML('beforeend', paginationHtml);
@@ -431,15 +455,15 @@ function renderCapitals(page, perPage, searchTerm) {
 
 function debounceCapitalsSearch(fn, delay) {
   return function() {
-    const args = arguments;
-    const self = this;
+    var args = arguments;
+    var self = this;
     if (searchTimeout) clearTimeout(searchTimeout);
     searchTimeout = setTimeout(function() { fn.apply(self, args); }, delay);
   };
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  const searchInput = document.getElementById('capitalSearch');
+  var searchInput = document.getElementById('capitalSearch');
   if (searchInput) {
     searchInput.addEventListener('input', debounceCapitalsSearch(function() {
       fetchAllCapitalsWeather(1, 6, this.value);
@@ -450,17 +474,26 @@ document.addEventListener('DOMContentLoaded', function() {
 function showCapitalDetails(capital, country, lat, lon) {
   fetchWeatherApi('/weather', { lat: lat, lon: lon })
     .then(function(weather) {
-      const html =
-        '<h5>' + capital + ', ' + country + '</h5>' +
-        '<div><img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="48"></div>' +
-        '<div><strong>' + Math.round(weather.main.temp) + '°C</strong> (' + weather.weather[0].main + ')</div>' +
-        '<div>Humidity: ' + weather.main.humidity + '%</div>' +
-        '<div>Pressure: ' + weather.main.pressure + ' hPa</div>' +
-        '<div>Wind: ' + formatWindSpeed(weather.wind.speed) + '</div>' +
-        '<div>Clouds: ' + weather.clouds.all + '%</div>' +
-        '<div>Visibility: ' + (weather.visibility / 1000) + ' km</div>';
+      var html =
+        '<h5 style="font-size:1.1rem;font-weight:700;margin-bottom:0.75rem;">' + capital + ', ' + country + '</h5>' +
+        '<div style="text-align:center;margin-bottom:0.75rem;"><img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '@2x.png" width="64" alt="' + weather.weather[0].main + '"></div>' +
+        '<div style="font-size:1.5rem;font-weight:700;text-align:center;margin-bottom:0.5rem;">' + Math.round(weather.main.temp) + '°C <span style="font-size:0.85rem;font-weight:400;color:var(--text-muted);">' + weather.weather[0].main + '</span></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.85rem;">' +
+        '<div style="color:var(--text-muted);">Humidity</div><div style="font-weight:600;">' + weather.main.humidity + '%</div>' +
+        '<div style="color:var(--text-muted);">Pressure</div><div style="font-weight:600;">' + weather.main.pressure + ' hPa</div>' +
+        '<div style="color:var(--text-muted);">Wind</div><div style="font-weight:600;">' + formatWindSpeed(weather.wind.speed) + '</div>' +
+        '<div style="color:var(--text-muted);">Clouds</div><div style="font-weight:600;">' + weather.clouds.all + '%</div>' +
+        '<div style="color:var(--text-muted);">Visibility</div><div style="font-weight:600;">' + (weather.visibility / 1000) + ' km</div>' +
+        '</div>';
       document.getElementById('capitalModalBody').innerHTML = html;
-      new bootstrap.Modal(document.getElementById('capitalModal')).show();
+      // Use custom modal instead of Bootstrap
+      if (typeof showCapitalModal === 'function') {
+        showCapitalModal();
+      } else {
+        // Fallback: try to open modal-overlay directly
+        var modal = document.getElementById('capitalModal');
+        if (modal) modal.classList.add('open');
+      }
     })
     .catch(function() {
       if (typeof showToast === 'function') showToast('Failed to load capital weather details', 'error');
