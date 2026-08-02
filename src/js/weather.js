@@ -7,8 +7,10 @@ import {
   weatherIconUrl,
   createElementWithText
 } from './utils.js';
+// Bundled rather than fetched: restcountries.com retired its open API and now
+// requires an account key. Regenerate with scripts/build-capitals.mjs.
+import allCapitals from '../data/capitals.json';
 
-let allCapitals = [];
 const capitalsWeatherCache = {};
 let searchTimeout = null;
 let capitalModalControls = null;
@@ -323,28 +325,8 @@ export function loadHomeWeather() {
 export function fetchAllCapitalsWeather(page = 1, perPage = 6, searchTerm = '') {
   const container = document.getElementById('nearbyPlaces');
   container.textContent = '';
-  container.appendChild(createElementWithText('div', 'Loading world capitals weather...', 'w-100 text-center py-3'));
   document.getElementById('capitalsCount').textContent = '';
-
-  if (allCapitals.length === 0) {
-    fetch('https://restcountries.com/v3.1/all?fields=capital,latlng,name', {
-      signal: AbortSignal.timeout(12000)
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load');
-        return res.json();
-      })
-      .then((countries) => {
-        allCapitals = countries.filter((c) => c.capital?.length && c.latlng?.length === 2);
-        renderCapitals(page, perPage, searchTerm);
-      })
-      .catch(() => {
-        container.textContent = '';
-        container.appendChild(createElementWithText('div', 'Failed to load capitals data.', 'w-100 text-center py-3 text-danger'));
-      });
-  } else {
-    renderCapitals(page, perPage, searchTerm);
-  }
+  renderCapitals(page, perPage, searchTerm);
 }
 
 function renderCapitals(page, perPage, searchTerm) {
@@ -363,7 +345,7 @@ function renderCapitals(page, perPage, searchTerm) {
   if (searchTerm) {
     const term = searchTerm.toLowerCase();
     filtered = allCapitals.filter(
-      (c) => c.capital[0].toLowerCase().includes(term) || c.name.common.toLowerCase().includes(term)
+      (c) => c.capital.toLowerCase().includes(term) || c.country.toLowerCase().includes(term)
     );
   }
 
@@ -380,10 +362,8 @@ function renderCapitals(page, perPage, searchTerm) {
   const scrollWrapper = createElementWithText('div', '', 'horizontal-scroll');
   const weatherSlots = new Map();
 
-  sliced.forEach((country) => {
-    const [lat, lon] = country.latlng;
-    const capital = country.capital[0];
-    const countryName = country.name.common;
+  sliced.forEach((entry) => {
+    const { lat, lon, capital, country: countryName } = entry;
 
     const card = document.createElement('div');
     card.className = 'capital-card';
@@ -420,9 +400,9 @@ function renderCapitals(page, perPage, searchTerm) {
     weatherDiv.appendChild(forecastImage(conditions.icon, 32));
   };
 
-  sliced.forEach((country) => {
-    const [lat, lon] = country.latlng;
-    const cacheKey = `${country.capital[0]},${country.name.common}`;
+  sliced.forEach((entry) => {
+    const { lat, lon } = entry;
+    const cacheKey = `${entry.capital},${entry.country}`;
     const weatherDiv = weatherSlots.get(cacheKey);
     if (!weatherDiv) return;
 
