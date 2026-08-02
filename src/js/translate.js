@@ -1,7 +1,8 @@
-import { fetchTranslate } from './api.js';
+import { fetchTranslation } from './api.js';
 import { applyDirection, getStoredLanguage, storeLanguage, isSupportedLanguage } from './i18n.js';
 
 const CACHE_PREFIX = 'weatherhub:tr:';
+const SOURCE_LANG = 'en';
 const listeners = new Set();
 
 let currentLang = 'en';
@@ -36,15 +37,16 @@ export function onLanguageChange(listener) {
 }
 
 /**
- * Translates one string or an array of strings, serving cached entries locally
- * and only sending the misses upstream.
+ * Translates a string or array. Cached entries are served locally and only the
+ * misses reach MyMemory, which matters because its free tier is counted in
+ * words per day and it accepts one string per request.
  */
 export async function translate(text, targetLang) {
-  const target = isSupportedLanguage(targetLang) ? targetLang : 'en';
+  const target = isSupportedLanguage(targetLang) ? targetLang : SOURCE_LANG;
   const isBatch = Array.isArray(text);
   const items = isBatch ? text : [text];
 
-  if (target === 'en') return isBatch ? items : items[0];
+  if (target === SOURCE_LANG) return isBatch ? items : items[0];
 
   const results = new Array(items.length);
   const missingIndexes = [];
@@ -70,22 +72,20 @@ export async function translate(text, targetLang) {
   }
 
   try {
-    const data = await fetchTranslate(missingTexts, target);
-    const translations = data?.data?.translations || [];
+    const translated = await fetchTranslation(missingTexts, SOURCE_LANG, target);
 
     missingIndexes.forEach((targetIndex, i) => {
-      const translated = translations[i]?.translatedText;
+      const value = translated[i];
       const original = missingTexts[i];
-      if (typeof translated === 'string' && translated.length) {
-        results[targetIndex] = translated;
-        writeCache(original, target, translated);
+      if (typeof value === 'string' && value.length) {
+        results[targetIndex] = value;
+        if (value !== original) writeCache(original, target, value);
       } else {
         results[targetIndex] = original;
       }
     });
   } catch (error) {
     console.error('Translation failed:', error);
-    // Falling back to the source text keeps the page readable.
     missingIndexes.forEach((targetIndex, i) => {
       results[targetIndex] = missingTexts[i];
     });
@@ -118,7 +118,7 @@ function collectTranslatable(root) {
 
 /**
  * Applies the active language to every `.translatable` element in scope. Pass a
- * root element to translate content that was rendered after the initial load.
+ * root element to translate content rendered after the initial load.
  */
 export async function translateAll(targetLang = currentLang, root) {
   const elements = collectTranslatable(root);
@@ -126,7 +126,7 @@ export async function translateAll(targetLang = currentLang, root) {
 
   const originals = elements.map((el) => el.dataset.original);
 
-  if (targetLang === 'en') {
+  if (targetLang === SOURCE_LANG) {
     elements.forEach((el, i) => { el.textContent = originals[i]; });
     return;
   }
@@ -145,7 +145,7 @@ export async function translateAll(targetLang = currentLang, root) {
 }
 
 export async function setLanguage(code) {
-  const target = isSupportedLanguage(code) ? code : 'en';
+  const target = isSupportedLanguage(code) ? code : SOURCE_LANG;
   currentLang = target;
   storeLanguage(target);
   applyDirection(target);
@@ -169,7 +169,7 @@ export function initTranslation() {
     select.addEventListener('change', (event) => setLanguage(event.target.value));
   }
 
-  if (currentLang !== 'en') {
+  if (currentLang !== SOURCE_LANG) {
     translateAll(currentLang);
   }
 }

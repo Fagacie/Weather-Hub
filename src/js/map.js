@@ -1,15 +1,33 @@
-import { getConfig } from './config.js';
-import { fetchWeatherApi, fetchPublicConfig } from './api.js';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+import { fetchCurrentWeather } from './api.js';
+import { searchPlaces } from './providers/openMeteo.js';
 import { formatWindSpeed, createElementWithText } from './utils.js';
 import { getCurrentLanguage } from './translate.js';
 
-const MAPS_CALLBACK = '__weatherHubMapsReady';
+const DEFAULT_CENTER = [5.3302, 103.1408];
+
+// Leaflet resolves its default icons by relative URL, which breaks once Vite
+// hashes the assets, so the bundled URLs are supplied explicitly.
+const defaultIcon = L.icon({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 let map;
 let marker;
-let infoWindow;
-let AdvancedMarkerElement;
 let clickTimer = null;
+let searchTimer = null;
+let searchAbort = null;
 
 function getUrlParams() {
   const params = new URLSearchParams(window.location.search);
@@ -30,177 +48,153 @@ function showMapError(message) {
   mapEl.appendChild(createElementWithText('div', message, 'alert alert-warning m-3'));
 }
 
-/**
- * Google calls this global when the key is invalid, unauthorised for this
- * referrer, or billing is disabled. Without it the map just renders blank.
- */
-window.gm_authFailure = () => {
-  showMapError(
-    'Google Maps rejected this API key. Check that the key is valid, billing is enabled, ' +
-    'and this domain is allowed under the key\'s HTTP referrer restrictions.'
-  );
-};
+function buildWeatherPopup(data, displayName) {
+  const condition = data?.weather?.[0] || {};
+  const container = document.createElement('div');
+  container.className = 'weather-popup';
 
-function loadMapsSdk(apiKey) {
-  if (window.google?.maps?.importLibrary) return Promise.resolve();
+  container.appendChild(createElementWithText('strong', displayName || data?.name || 'Selected location'));
+  container.appendChild(document.createElement('br'));
+  container.appendChild(createElementWithText(
+    'span',
+    `${condition.main || 'Unknown'}, ${Number.isFinite(data?.main?.temp) ? Math.round(data.main.temp) : '--'}°C`
+  ));
+  container.appendChild(document.createElement('br'));
+  container.appendChild(createElementWithText('span', `Humidity: ${data?.main?.humidity ?? '--'}%`));
+  container.appendChild(document.createElement('br'));
+  container.appendChild(createElementWithText(
+    'span',
+    `Wind: ${Number.isFinite(data?.wind?.speed) ? formatWindSpeed(data.wind.speed) : '--'}`
+  ));
 
-  return new Promise((resolve, reject) => {
-    const params = new URLSearchParams({
-      key: apiKey,
-      v: 'weekly',
-      loading: 'async',
-      libraries: 'maps,marker,places',
-      callback: MAPS_CALLBACK
-    });
-
-    window[MAPS_CALLBACK] = () => resolve();
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
-    script.async = true;
-    script.onerror = () => reject(new Error('The Google Maps script could not be loaded.'));
-    document.head.appendChild(script);
-  });
+  return container;
 }
 
-function placeMarker(position) {
-  if (marker) marker.map = null;
-  marker = new AdvancedMarkerElement({ map, position });
+function placeMarker(lat, lon) {
+  if (marker) {
+    marker.setLatLng([lat, lon]);
+  } else {
+    marker = L.marker([lat, lon], { icon: defaultIcon }).addTo(map);
+  }
+  return marker;
 }
 
-async function fetchMapWeather(lat, lon, displayName) {
+async function showWeatherAt(lat, lon, displayName) {
+  const pin = placeMarker(lat, lon);
+  pin.bindPopup(createElementWithText('div', 'Loading weather...', 'weather-popup')).openPopup();
+
   try {
-    const data = await fetchWeatherApi('/weather', { lat, lon, lang: getCurrentLanguage() });
-    const condition = data?.weather?.[0] || {};
-    const name = displayName || data?.name || 'Selected location';
-
-    const container = document.createElement('div');
-    container.className = 'weather-popup';
-    container.appendChild(createElementWithText('strong', name));
-    container.appendChild(document.createElement('br'));
-    container.appendChild(createElementWithText(
-      'span',
-      `${condition.main || 'Unknown'}, ${Number.isFinite(data?.main?.temp) ? Math.round(data.main.temp) : '--'}°C`
-    ));
-    container.appendChild(document.createElement('br'));
-    container.appendChild(createElementWithText('span', `Humidity: ${data?.main?.humidity ?? '--'}%`));
-    container.appendChild(document.createElement('br'));
-    container.appendChild(createElementWithText(
-      'span',
-      `Wind: ${Number.isFinite(data?.wind?.speed) ? formatWindSpeed(data.wind.speed) : '--'}`
-    ));
-
-    infoWindow.setContent(container);
-    infoWindow.open({ map, anchor: marker });
+    const data = await fetchCurrentWeather({ lat, lon, lang: getCurrentLanguage() });
+    pin.setPopupContent(buildWeatherPopup(data, displayName));
   } catch (error) {
-    infoWindow.setContent(
+    pin.setPopupContent(
       createElementWithText('div', error.message || 'Failed to load weather', 'weather-popup text-danger')
     );
-    infoWindow.open({ map, anchor: marker });
   }
 }
 
 /**
- * `google.maps.places.SearchBox` was deprecated in March 2025; the replacement
- * is a web component, so the plain input is swapped for it.
+ * Supersedes any in-flight lookup so fast typing cannot render stale results.
  */
-async function initPlaceSearch(placesLibrary) {
-  const input = document.getElementById('mapSearch');
-  if (!input || !placesLibrary?.PlaceAutocompleteElement) return null;
-
-  const autocomplete = new placesLibrary.PlaceAutocompleteElement();
-  autocomplete.id = 'mapSearch';
-  autocomplete.className = 'map-search-input';
-  input.replaceWith(autocomplete);
-
-  const onSelect = async (event) => {
-    const prediction = event.placePrediction || event.detail?.placePrediction;
-    if (!prediction) return;
-
-    const place = prediction.toPlace();
-    await place.fetchFields({ fields: ['location', 'displayName'] });
-    if (!place.location) return;
-
-    const position = { lat: place.location.lat(), lng: place.location.lng() };
-    map.setCenter(position);
-    map.setZoom(10);
-    placeMarker(position);
-    fetchMapWeather(position.lat, position.lng, place.displayName);
-  };
-
-  autocomplete.addEventListener('gmp-select', onSelect);
-  return autocomplete;
+function lookupPlaces(query) {
+  searchAbort?.abort();
+  searchAbort = new AbortController();
+  return searchPlaces(query, { signal: searchAbort.signal });
 }
 
-async function initMap(mapId) {
-  const { Map, InfoWindow } = await google.maps.importLibrary('maps');
-  const markerLibrary = await google.maps.importLibrary('marker');
-  const placesLibrary = await google.maps.importLibrary('places');
+function renderSuggestions(listEl, places) {
+  listEl.textContent = '';
 
-  // `Marker` was deprecated in February 2024; AdvancedMarkerElement needs a mapId.
-  AdvancedMarkerElement = markerLibrary.AdvancedMarkerElement;
-
-  const urlParams = getUrlParams();
-  const center = urlParams
-    ? { lat: urlParams.lat, lng: urlParams.lon }
-    : { lat: 5.3302, lng: 103.1408 };
-
-  map = new Map(document.getElementById('map'), {
-    center,
-    zoom: urlParams ? 8 : 10,
-    mapId: mapId || 'DEMO_MAP_ID'
-  });
-
-  infoWindow = new InfoWindow();
-
-  // Rapid clicks would otherwise queue overlapping weather requests.
-  map.addListener('click', (event) => {
-    clearTimeout(clickTimer);
-    clickTimer = setTimeout(() => {
-      placeMarker(event.latLng);
-      fetchMapWeather(event.latLng.lat(), event.latLng.lng());
-    }, 200);
-  });
-
-  await initPlaceSearch(placesLibrary);
-
-  if (urlParams) {
-    const position = { lat: urlParams.lat, lng: urlParams.lon };
-    placeMarker(position);
-    fetchMapWeather(urlParams.lat, urlParams.lon, urlParams.name);
-
-    const routeInfo = document.getElementById('routeInfo');
-    if (routeInfo) {
-      routeInfo.textContent = `Showing weather for ${urlParams.name || `${urlParams.lat}, ${urlParams.lon}`}`;
-    }
-  }
-}
-
-export async function loadGoogleMaps() {
-  let apiKey = getConfig().GOOGLE_MAPS_API_KEY;
-  let mapId = '';
-
-  if (!apiKey) {
-    try {
-      const config = await fetchPublicConfig();
-      apiKey = config.googleMapsApiKey || '';
-      mapId = config.mapId || '';
-    } catch (error) {
-      showMapError(`Unable to load map configuration from the server. ${error.message}`);
-      return;
-    }
-  }
-
-  if (!apiKey) {
-    showMapError('Google Maps is not configured. Set GOOGLE_MAPS_API_KEY as a Firebase Functions secret.');
+  if (!places.length) {
+    listEl.style.display = 'none';
     return;
   }
 
+  places.forEach((place) => {
+    const item = createElementWithText('button', place.label, 'map-suggestion');
+    item.type = 'button';
+    item.addEventListener('click', () => {
+      map.setView([place.lat, place.lon], 10);
+      showWeatherAt(place.lat, place.lon, place.name);
+      listEl.style.display = 'none';
+      document.getElementById('mapSearch').value = place.label;
+    });
+    listEl.appendChild(item);
+  });
+
+  listEl.style.display = '';
+}
+
+function initSearch() {
+  const input = document.getElementById('mapSearch');
+  if (!input) return;
+
+  const listEl = document.createElement('div');
+  listEl.className = 'map-suggestions';
+  listEl.style.display = 'none';
+  input.insertAdjacentElement('afterend', listEl);
+
+  input.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const query = input.value.trim();
+
+    if (query.length < 3) {
+      listEl.style.display = 'none';
+      return;
+    }
+
+    searchTimer = setTimeout(async () => {
+      try {
+        renderSuggestions(listEl, await lookupPlaces(query));
+      } catch {
+        listEl.style.display = 'none';
+      }
+    }, 500);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!listEl.contains(event.target) && event.target !== input) {
+      listEl.style.display = 'none';
+    }
+  });
+}
+
+export function loadMap() {
+  const mapEl = document.getElementById('map');
+  if (!mapEl) return;
+
   try {
-    await loadMapsSdk(apiKey);
-    await initMap(mapId);
+    const urlParams = getUrlParams();
+    const center = urlParams ? [urlParams.lat, urlParams.lon] : DEFAULT_CENTER;
+
+    map = L.map(mapEl).setView(center, urlParams ? 8 : 10);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Debounced so dragging or double-clicking cannot queue overlapping requests.
+    map.on('click', (event) => {
+      clearTimeout(clickTimer);
+      const { lat, lng } = event.latlng;
+      clickTimer = setTimeout(() => showWeatherAt(lat, lng), 200);
+    });
+
+    initSearch();
+
+    if (urlParams) {
+      showWeatherAt(urlParams.lat, urlParams.lon, urlParams.name);
+      const input = document.getElementById('mapSearch');
+      if (urlParams.name && input) input.value = urlParams.name;
+
+      const routeInfo = document.getElementById('routeInfo');
+      if (routeInfo) {
+        routeInfo.textContent = `Showing weather for ${urlParams.name || `${urlParams.lat}, ${urlParams.lon}`}`;
+      }
+    }
   } catch (error) {
-    console.error('Google Maps failed to initialise:', error);
-    showMapError(error.message || 'Google Maps failed to load.');
+    console.error('Map failed to initialise:', error);
+    showMapError(error.message || 'The map failed to load.');
   }
 }

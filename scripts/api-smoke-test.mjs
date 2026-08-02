@@ -1,259 +1,168 @@
 #!/usr/bin/env node
 /**
- * End-to-end smoke tests for the Weather-Hub API.
+ * Verifies every external provider Weather Hub depends on. There is no backend
+ * to test, so this calls the same public endpoints the browser calls.
  *
- *   node scripts/api-smoke-test.mjs                       # against production
- *   node scripts/api-smoke-test.mjs http://localhost:5000 # against the emulator
- *
- * Asserts real HTTP status codes and payload shapes. No mocks.
+ *   npm run test:api
  */
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const BASE = (process.argv[2] || 'https://weather-hub-5ccbb.web.app').replace(/\/$/, '');
-const API = `${BASE}/api`;
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-const results = [];
-let failures = 0;
-
-const GREEN = '\x1b[32m';
-const RED = '\x1b[31m';
-const DIM = '\x1b[2m';
-const RESET = '\x1b[0m';
-
-async function call(path, init = {}) {
-  const started = Date.now();
+function loadEnvLocal() {
   try {
-    const res = await fetch(`${API}${path}`, {
-      ...init,
-      signal: AbortSignal.timeout(20000)
-    });
-    let body = null;
-    try {
-      body = await res.json();
-    } catch {
-      body = null;
+    const raw = readFileSync(resolve(ROOT, '.env.local'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+      if (match && !process.env[match[1]]) process.env[match[1]] = match[2];
     }
-    return { status: res.status, body, ms: Date.now() - started };
-  } catch (error) {
-    return { status: 0, body: null, error: error.message, ms: Date.now() - started };
+  } catch {
+    // No .env.local: fall back to the ambient environment.
   }
 }
 
-function post(path, payload) {
-  return call(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+loadEnvLocal();
+
+const OPENWEATHER_KEY = process.env.VITE_OPENWEATHER_API_KEY || '';
+const results = [];
+
+function record(name, ok, detail) {
+  results.push({ name, ok, detail });
+  const label = ok ? 'PASS' : 'FAIL';
+  console.log(`${label}  ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
 async function check(name, fn) {
-  let outcome;
   try {
-    outcome = await fn();
+    const detail = await fn();
+    record(name, true, detail);
   } catch (error) {
-    outcome = { ok: false, detail: error.message };
+    record(name, false, error.message);
   }
-
-  results.push({ name, ...outcome });
-  if (!outcome.ok) failures += 1;
-
-  const icon = outcome.ok ? `${GREEN}PASS${RESET}` : `${RED}FAIL${RESET}`;
-  console.log(`${icon}  ${name}${outcome.detail ? ` ${DIM}- ${outcome.detail}${RESET}` : ''}`);
 }
 
-const expect = (condition, detail) => ({ ok: Boolean(condition), detail });
+async function getJson(url, label) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const text = await response.text();
 
-async function run() {
-  console.log(`\nWeather-Hub API smoke tests\nTarget: ${API}\n${'-'.repeat(60)}\n`);
-
-  console.log('Infrastructure');
-  await check('GET /health returns ok with key report', async () => {
-    const r = await call('/health');
-    const configured = r.body?.configured || {};
-    const missing = Object.entries(configured)
-      .filter(([, present]) => !present)
-      .map(([key]) => key);
-    return expect(
-      r.status === 200 && r.body?.status === 'ok',
-      `status=${r.status}${missing.length ? ` missing keys: ${missing.join(', ')}` : ' all keys present'}`
-    );
-  });
-
-  await check('GET /config/public exposes only the browser key', async () => {
-    const r = await call('/config/public');
-    const keys = Object.keys(r.body || {});
-    const leaked = keys.filter((k) => !['googleMapsApiKey', 'mapId'].includes(k));
-    return expect(r.status === 200 && leaked.length === 0, `status=${r.status} keys=${keys.join(',')}`);
-  });
-
-  await check('Unknown route returns 404', async () => {
-    const r = await call('/does-not-exist');
-    return expect(r.status === 404, `status=${r.status}`);
-  });
-
-  console.log('\nOpenWeather');
-  await check('Valid city returns weather', async () => {
-    const r = await call('/weather?city=London');
-    return expect(
-      r.status === 200 && typeof r.body?.main?.temp === 'number',
-      `status=${r.status} temp=${r.body?.main?.temp} (${r.ms}ms)`
-    );
-  });
-
-  await check('Invalid city returns 404 with a message', async () => {
-    const r = await call('/weather?city=zzzzzznotarealcity');
-    return expect(r.status === 404 && Boolean(r.body?.message), `status=${r.status} msg="${r.body?.message}"`);
-  });
-
-  await check('Empty city returns 400', async () => {
-    const r = await call('/weather?city=');
-    return expect(r.status === 400, `status=${r.status}`);
-  });
-
-  await check('Missing params returns 400', async () => {
-    const r = await call('/weather');
-    return expect(r.status === 400, `status=${r.status}`);
-  });
-
-  await check('Valid lat/lon returns weather', async () => {
-    const r = await call('/weather?lat=3.139&lon=101.6869');
-    return expect(r.status === 200 && Boolean(r.body?.weather?.[0]), `status=${r.status} name=${r.body?.name}`);
-  });
-
-  await check('Out-of-range lat returns 400', async () => {
-    const r = await call('/weather?lat=999&lon=101');
-    return expect(r.status === 400, `status=${r.status}`);
-  });
-
-  await check('Arabic lang returns localised description', async () => {
-    const r = await call('/weather?city=Cairo&lang=ar');
-    const desc = r.body?.weather?.[0]?.description || '';
-    return expect(r.status === 200 && /[\u0600-\u06FF]/.test(desc), `desc="${desc}"`);
-  });
-
-  await check('Forecast returns a list', async () => {
-    const r = await call('/forecast?lat=3.139&lon=101.6869');
-    return expect(
-      r.status === 200 && Array.isArray(r.body?.list) && r.body.list.length > 0,
-      `status=${r.status} items=${r.body?.list?.length}`
-    );
-  });
-
-  await check('Forecast entries expose epoch dt for safe date parsing', async () => {
-    const r = await call('/forecast?city=Tokyo');
-    return expect(Number.isFinite(r.body?.list?.[0]?.dt), `dt=${r.body?.list?.[0]?.dt}`);
-  });
-
-  await check('UV endpoint always answers with availability', async () => {
-    const r = await call('/uv?lat=3.139&lon=101.6869');
-    return expect(
-      r.status === 200 && typeof r.body?.available === 'boolean',
-      `available=${r.body?.available} reason=${r.body?.reason ?? 'n/a'}`
-    );
-  });
-
-  console.log('\nGoogle Translate');
-  await check('English to Arabic', async () => {
-    const r = await post('/translate', { text: 'Cloudy with light rain', target: 'ar' });
-    const out = r.body?.data?.translations?.[0]?.translatedText || '';
-    return expect(r.status === 200 && /[\u0600-\u06FF]/.test(out), `out="${out}"`);
-  });
-
-  await check('Arabic to English', async () => {
-    const r = await post('/translate', { text: 'مشمس', target: 'en' });
-    const out = r.body?.data?.translations?.[0]?.translatedText || '';
-    return expect(r.status === 200 && /[A-Za-z]/.test(out), `out="${out}"`);
-  });
-
-  await check('Malay to English', async () => {
-    const r = await post('/translate', { text: 'Hujan lebat', target: 'en', source: 'ms' });
-    const out = r.body?.data?.translations?.[0]?.translatedText || '';
-    return expect(r.status === 200 && /[A-Za-z]/.test(out), `out="${out}"`);
-  });
-
-  await check('Batch array translates every item', async () => {
-    const r = await post('/translate', { text: ['Home', 'Map', 'About'], target: 'ms' });
-    const out = r.body?.data?.translations || [];
-    return expect(r.status === 200 && out.length === 3, `count=${out.length}`);
-  });
-
-  await check('format:text prevents HTML entity escaping', async () => {
-    const r = await post('/translate', { text: "Today's weather", target: 'ms' });
-    const out = r.body?.data?.translations?.[0]?.translatedText || '';
-    return expect(r.status === 200 && !out.includes('&#39;'), `out="${out}"`);
-  });
-
-  await check('GET with query params works', async () => {
-    const r = await call('/translate?text=Sunny&target=ms');
-    return expect(r.status === 200 && Boolean(r.body?.data?.translations), `status=${r.status}`);
-  });
-
-  await check('Empty text returns 400', async () => {
-    const r = await post('/translate', { text: '', target: 'ar' });
-    return expect(r.status === 400, `status=${r.status}`);
-  });
-
-  await check('Invalid target returns 400', async () => {
-    const r = await post('/translate', { text: 'Hello', target: 'notalang' });
-    return expect(r.status === 400, `status=${r.status}`);
-  });
-
-  await check('Long text (5000 chars) is accepted', async () => {
-    const r = await post('/translate', { text: 'weather '.repeat(625), target: 'ms' });
-    return expect(r.status === 200, `status=${r.status} (${r.ms}ms)`);
-  });
-
-  console.log('\nGoogle Geocoding');
-  await check('Valid coordinates resolve to a place name', async () => {
-    const r = await call('/reverse-geocode?lat=3.139&lon=101.6869');
-    return expect(
-      r.status === 200 && typeof r.body?.display_name === 'string' && r.body.display_name.length > 0,
-      `name="${r.body?.display_name}"`
-    );
-  });
-
-  await check('Mid-ocean coordinates return a null name, not an error', async () => {
-    const r = await call('/reverse-geocode?lat=0&lon=0');
-    return expect(r.status === 200, `status=${r.status} name=${r.body?.display_name}`);
-  });
-
-  await check('Invalid coordinates return 400', async () => {
-    const r = await call('/reverse-geocode?lat=abc&lon=xyz');
-    return expect(r.status === 400, `status=${r.status}`);
-  });
-
-  console.log('\nValidation and limits');
-  await check('Contact rejects a malformed email', async () => {
-    const r = await post('/contact', { name: 'Test', email: 'not-an-email', message: 'Hello' });
-    return expect(r.status === 400, `status=${r.status}`);
-  });
-
-  await check('Wrong method on /weather returns 405', async () => {
-    const r = await post('/weather', {});
-    return expect(r.status === 405, `status=${r.status}`);
-  });
-
-  await check('Translate tier rate limits at 30/min with Retry-After', async () => {
-    const burst = await Promise.all(
-      Array.from({ length: 36 }, () => post('/translate', { text: 'rate limit probe', target: 'ms' }))
-    );
-    const limited = burst.filter((r) => r.status === 429);
-    return expect(limited.length > 0, `${limited.length}/36 requests limited`);
-  });
-
-  console.log(`\n${'-'.repeat(60)}`);
-  const passed = results.length - failures;
-  console.log(`${passed}/${results.length} passed`);
-
-  if (failures > 0) {
-    console.log(`\n${RED}Failures:${RESET}`);
-    results.filter((r) => !r.ok).forEach((r) => console.log(`  - ${r.name}: ${r.detail ?? ''}`));
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`${label} returned non-JSON (HTTP ${response.status})`);
   }
 
-  process.exit(failures > 0 ? 1 : 0);
+  return { response, data };
+}
+
+const OW = 'https://api.openweathermap.org';
+
+async function run() {
+  console.log('Weather Hub provider smoke test\n');
+
+  if (!OPENWEATHER_KEY) {
+    record('OpenWeather key present', false, 'VITE_OPENWEATHER_API_KEY is empty in .env.local');
+  } else {
+    record('OpenWeather key present', true, `${OPENWEATHER_KEY.slice(0, 4)}…`);
+
+    await check('OpenWeather current weather (London)', async () => {
+      const { response, data } = await getJson(
+        `${OW}/data/2.5/weather?q=London&units=metric&appid=${OPENWEATHER_KEY}`,
+        'OpenWeather'
+      );
+      if (response.status === 401) {
+        throw new Error('401 — key invalid or not activated yet (can take up to 2 hours)');
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${data?.message}`);
+      if (!Number.isFinite(data?.main?.temp)) throw new Error('no temperature in response');
+      return `${Math.round(data.main.temp)}°C, ${data.weather?.[0]?.description}`;
+    });
+
+    await check('OpenWeather 5-day forecast (coords)', async () => {
+      const { response, data } = await getJson(
+        `${OW}/data/2.5/forecast?lat=5.33&lon=103.14&units=metric&appid=${OPENWEATHER_KEY}`,
+        'OpenWeather'
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${data?.message}`);
+      if (!Array.isArray(data?.list) || !data.list.length) throw new Error('empty forecast list');
+      return `${data.list.length} slots`;
+    });
+
+    await check('OpenWeather reverse geocoding', async () => {
+      const { response, data } = await getJson(
+        `${OW}/geo/1.0/reverse?lat=48.8584&lon=2.2945&limit=1&appid=${OPENWEATHER_KEY}`,
+        'OpenWeather'
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!Array.isArray(data) || !data[0]?.name) throw new Error('no place returned');
+      return `${data[0].name}, ${data[0].country}`;
+    });
+
+    await check('OpenWeather rejects a bad city with 404', async () => {
+      const { response } = await getJson(
+        `${OW}/data/2.5/weather?q=zzzznotarealplace&appid=${OPENWEATHER_KEY}`,
+        'OpenWeather'
+      );
+      if (response.status !== 404) throw new Error(`expected 404, got ${response.status}`);
+      return 'handled';
+    });
+  }
+
+  await check('Open-Meteo UV index (no key required)', async () => {
+    const { response, data } = await getJson(
+      'https://api.open-meteo.com/v1/forecast?latitude=5.33&longitude=103.14&current=uv_index',
+      'Open-Meteo'
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const uv = data?.current?.uv_index;
+    if (!Number.isFinite(uv)) throw new Error('no uv_index in response');
+    return `UV ${uv}`;
+  });
+
+  await check('MyMemory translation (en to ar)', async () => {
+    const { response, data } = await getJson(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent('Partly cloudy')}&langpair=en|ar`,
+      'MyMemory'
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const translated = data?.responseData?.translatedText;
+    if (!translated) throw new Error('empty translation');
+    if (Number(data.responseStatus) === 429) throw new Error('daily quota exhausted');
+    return translated;
+  });
+
+  await check('Open-Meteo place search (map autocomplete)', async () => {
+    const { response, data } = await getJson(
+      'https://geocoding-api.open-meteo.com/v1/search?name=Kuala+Lumpur&count=1&format=json',
+      'Open-Meteo geocoding'
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const place = data?.results?.[0];
+    if (!place) throw new Error('no results');
+    return `${place.name}, ${place.country}`;
+  });
+
+  await check('OpenStreetMap tile server', async () => {
+    const response = await fetch('https://tile.openstreetmap.org/10/512/512.png', {
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return `tile ok (${response.headers.get('content-type')})`;
+  });
+
+  const failed = results.filter((r) => !r.ok);
+  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+
+  if (failed.length) {
+    console.log('\nFailed checks:');
+    failed.forEach((r) => console.log(`  - ${r.name}: ${r.detail}`));
+    process.exitCode = 1;
+  }
 }
 
 run().catch((error) => {
-  console.error('Smoke test runner crashed:', error);
-  process.exit(1);
+  console.error('Smoke test crashed:', error);
+  process.exitCode = 1;
 });

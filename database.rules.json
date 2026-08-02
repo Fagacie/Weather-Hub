@@ -21,7 +21,28 @@
     },
     "contactMessages": {
       ".read": false,
-      ".write": false
+      "$messageId": {
+        ".write": "!data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['name', 'email', 'message', 'createdAt', 'status'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length <= 254 && newData.val().matches(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$/)"
+        },
+        "message": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 2000"
+        },
+        "createdAt": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.val() === 'new'"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
     }
   }
 }

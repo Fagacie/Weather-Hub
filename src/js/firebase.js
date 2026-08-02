@@ -41,4 +41,9 @@ export function getInitError() {
   return initError;
 }
 
+export function getDatabase() {
+  if (!isFirebaseReady() && !initFirebase()) return null;
+  return firebase.database();
+}
+
 export { firebase };

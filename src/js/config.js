@@ -8,8 +8,9 @@ function pick(envValue, fallback) {
 
 export function getConfig() {
   return {
-    WEATHER_API_BASE_URL: pick(import.meta.env.VITE_WEATHER_API_BASE_URL, '/api'),
-    GOOGLE_MAPS_API_KEY: pick(import.meta.env.VITE_GOOGLE_MAPS_API_KEY, ''),
+    // Public by necessity: with no backend, the browser calls OpenWeather
+    // directly. A free-tier key cannot incur charges, only rate limits.
+    OPENWEATHER_API_KEY: pick(import.meta.env.VITE_OPENWEATHER_API_KEY, ''),
     FIREBASE_CONFIG: {
       apiKey: pick(import.meta.env.VITE_FIREBASE_API_KEY, FIREBASE_CONFIG.apiKey),
       authDomain: pick(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, FIREBASE_CONFIG.authDomain),

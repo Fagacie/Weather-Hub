@@ -24,6 +24,14 @@ document.getElementById('contactForm')?.addEventListener('submit', async (e) => 
     return;
   }
 
+  // Mirrors the database rule, which would otherwise fail with an opaque
+  // permission error.
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
+    msg.textContent = 'Please enter a valid email address.';
+    msg.className = 'auth-msg error';
+    return;
+  }
+
   msg.textContent = 'Sending...';
   msg.className = 'auth-msg';
   if (submitBtn) submitBtn.disabled = true;
@@ -34,7 +42,10 @@ document.getElementById('contactForm')?.addEventListener('submit', async (e) => 
     msg.className = 'auth-msg success';
     document.getElementById('contactForm').reset();
   } catch (err) {
-    msg.textContent = err.message || 'Failed to send message. Please try again.';
+    const denied = err.code === 'PERMISSION_DENIED' || /permission/i.test(err.message || '');
+    msg.textContent = denied
+      ? 'Your message was rejected. Please check the fields and try again.'
+      : err.message || 'Failed to send message. Please try again.';
     msg.className = 'auth-msg error';
   } finally {
     if (submitBtn) submitBtn.disabled = false;

@@ -1,7 +1,6 @@
 {
   "emulators": {
     "hosting": { "port": 5000 },
-    "functions": { "port": 5001 },
     "database": { "port": 9000 },
     "auth": { "port": 9099 },
     "ui": { "enabled": true }
@@ -9,33 +8,17 @@
   "database": {
     "rules": "database.rules.json"
   },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log"
-      ]
-    }
-  ],
   "hosting": {
     "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**",
-      "functions/**"
+      "**/node_modules/**"
     ],
     "rewrites": [
       {
-        "source": "/api/**",
-        "function": {
-          "functionId": "api",
-          "region": "us-central1"
-        }
+        "source": "**",
+        "destination": "/404.html"
       }
     ]
   }

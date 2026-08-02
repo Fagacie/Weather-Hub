@@ -1,107 +1,54 @@
-import { getConfig } from './config.js';
+/**
+ * Single entry point for external data. Every provider is called directly from
+ * the browser: this app runs on the Firebase Spark plan, which has no Cloud
+ * Functions, so there is no server-side proxy to hide keys behind.
+ */
+import { getCurrentWeather, getForecast, reverseGeocode } from './providers/openweather.js';
+import { getUvIndex } from './providers/openMeteo.js';
+import { translateTexts } from './providers/myMemory.js';
+import { getDatabase } from './firebase.js';
 
-const DEFAULT_TIMEOUT_MS = 12000;
+export { ApiError } from './providers/http.js';
 
-const baseUrl = () => (getConfig().WEATHER_API_BASE_URL || '/api').replace(/\/$/, '');
-
-export function buildWeatherApiUrl(endpoint, params = {}) {
-  const query = new URLSearchParams(params);
-  return `${baseUrl()}${endpoint}?${query.toString()}`;
+export function fetchCurrentWeather(options) {
+  return getCurrentWeather(options);
 }
 
-export function buildApiUrl(endpoint) {
-  return `${baseUrl()}${endpoint}`;
+export function fetchForecast(options) {
+  return getForecast(options);
+}
+
+export function fetchReverseGeocode(lat, lon, options) {
+  return reverseGeocode(lat, lon, options);
+}
+
+export function fetchUvIndex(lat, lon, options) {
+  return getUvIndex(lat, lon, options);
+}
+
+export function fetchTranslation(texts, source, target, options) {
+  return translateTexts(texts, source, target, options);
 }
 
 /**
- * Combines a caller-supplied AbortSignal with a timeout so a hung request can
- * never leave a spinner running forever.
+ * Contact messages are written straight to the Realtime Database. The security
+ * rules make this node write-only and validate every field, so the browser can
+ * create a message but never read one back.
  */
-function withTimeout(signal, timeoutMs) {
-  const timeoutSignal = AbortSignal.timeout(timeoutMs);
-  if (!signal) return timeoutSignal;
-  return AbortSignal.any ? AbortSignal.any([signal, timeoutSignal]) : signal;
-}
-
-async function readJson(res) {
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-function toRequestError(error) {
-  if (error.name === 'AbortError') return error;
-  if (error.name === 'TimeoutError') return new Error('The request timed out. Please try again.');
-  return new Error('Network error. Check your internet connection.');
-}
-
-async function request(url, { signal, timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = {}) {
-  let res;
-  try {
-    res = await fetch(url, { ...init, signal: withTimeout(signal, timeoutMs) });
-  } catch (error) {
-    throw toRequestError(error);
+export async function submitContact({ name, email, message }) {
+  const database = getDatabase();
+  if (!database) {
+    throw new Error('Messaging is unavailable because Firebase is not configured.');
   }
 
-  const data = await readJson(res);
-
-  if (!res.ok) {
-    throw new Error(data?.message || `Request failed (${res.status})`);
-  }
-  if (data === null) {
-    throw new Error('The server returned an unreadable response.');
-  }
-
-  return data;
-}
-
-export function parseWeatherResponse(res) {
-  return res.json().then((data) => {
-    if (!res.ok || (data.cod && Number(data.cod) >= 400)) {
-      throw new Error(data.message || 'Weather data unavailable');
-    }
-    return data;
+  const ref = database.ref('contactMessages').push();
+  await ref.set({
+    name: name.slice(0, 100),
+    email: email.slice(0, 254).toLowerCase(),
+    message: message.slice(0, 2000),
+    createdAt: new Date().toISOString(),
+    status: 'new'
   });
-}
 
-export function fetchWeatherApi(endpoint, params = {}, options = {}) {
-  return request(buildWeatherApiUrl(endpoint, params), options);
-}
-
-export function fetchTranslate(text, target, options = {}) {
-  return request(buildApiUrl('/translate'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, target }),
-    timeoutMs: 15000,
-    ...options
-  });
-}
-
-export function fetchReverseGeocode(lat, lon, lang, options = {}) {
-  const params = lang && lang !== 'en' ? { lat, lon, lang } : { lat, lon };
-  return fetchWeatherApi('/reverse-geocode', params, options);
-}
-
-export function fetchUvIndex(lat, lon, options = {}) {
-  return fetchWeatherApi('/uv', { lat, lon }, options);
-}
-
-export function fetchPublicConfig(options = {}) {
-  return request(buildApiUrl('/config/public'), options);
-}
-
-export function submitContact({ name, email, message }, options = {}) {
-  return request(buildApiUrl('/contact'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, email, message }),
-    ...options
-  });
-}
-
-export function fetchHealth(options = {}) {
-  return request(buildApiUrl('/health'), options);
+  return { ok: true, id: ref.key };
 }

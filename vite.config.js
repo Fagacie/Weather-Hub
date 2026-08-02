@@ -16,13 +16,5 @@ export default defineConfig({
         notFound: resolve(__dirname, '404.html')
       }
     }
-  },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:5000',
-        changeOrigin: true
-      }
-    }
   }
 });

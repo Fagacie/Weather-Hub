@@ -1,4 +1,4 @@
-import { fetchWeatherApi, fetchReverseGeocode, fetchUvIndex } from './api.js';
+import { fetchCurrentWeather, fetchForecast, fetchReverseGeocode, fetchUvIndex } from './api.js';
 import { translate, translateAll, getCurrentLanguage, onLanguageChange } from './translate.js';
 import { showLoader, showToast, initModal } from './ui.js';
 import {
@@ -142,30 +142,27 @@ async function displayWeatherData(data) {
 }
 
 /**
- * UV index comes from One Call 3.0, a separate subscription. When it is not
- * available the tile is hidden rather than left showing a permanent dash.
+ * UV comes from Open-Meteo, which needs no key, so the tile works out of the
+ * box. It is hidden only if the service itself is unreachable.
  */
 async function loadUvIndex(lat, lon) {
   const valueEl = document.getElementById('uvIndex');
   if (!valueEl) return;
   const row = valueEl.closest('.now-stat-row') || valueEl.parentElement;
 
-  try {
-    const data = await fetchUvIndex(lat, lon);
-    if (data?.available && Number.isFinite(data.uvi)) {
-      valueEl.textContent = String(Math.round(data.uvi));
-      if (row) row.style.display = '';
-    } else if (row) {
-      row.style.display = 'none';
-    }
-  } catch {
-    if (row) row.style.display = 'none';
+  const uv = await fetchUvIndex(lat, lon);
+
+  if (Number.isFinite(uv)) {
+    valueEl.textContent = String(Math.round(uv));
+    if (row) row.style.display = '';
+  } else if (row) {
+    row.style.display = 'none';
   }
 }
 
 export function getLocationName(lat, lon, callback) {
-  fetchReverseGeocode(lat, lon, getCurrentLanguage())
-    .then((data) => callback(data?.display_name || null))
+  fetchReverseGeocode(lat, lon)
+    .then((name) => callback(name))
     .catch(() => callback(null));
 }
 
@@ -189,11 +186,11 @@ export function fetchWeatherAndForecast(lat, lon) {
   lastLocation = { lat, lon };
   showLoader(true);
 
-  fetchWeatherApi('/weather', { lat, lon, lang: getCurrentLanguage() })
+  fetchCurrentWeather({ lat, lon, lang: getCurrentLanguage() })
     .then(async (data) => {
       await displayWeatherData(data);
       showLoader(false);
-      fetchForecast({ lat, lon });
+      loadForecast({ lat, lon });
       loadUvIndex(lat, lon);
     })
     .catch((err) => {
@@ -206,11 +203,11 @@ export function fetchWeatherByCityAndForecast(city) {
   lastLocation = { city };
   showLoader(true);
 
-  fetchWeatherApi('/weather', { city, lang: getCurrentLanguage() })
+  fetchCurrentWeather({ city, lang: getCurrentLanguage() })
     .then(async (data) => {
       await displayWeatherData(data);
       showLoader(false);
-      fetchForecast({ city });
+      loadForecast({ city });
       if (Number.isFinite(data?.coord?.lat) && Number.isFinite(data?.coord?.lon)) {
         loadUvIndex(data.coord.lat, data.coord.lon);
       }
@@ -221,8 +218,8 @@ export function fetchWeatherByCityAndForecast(city) {
     });
 }
 
-function fetchForecast(params) {
-  fetchWeatherApi('/forecast', { ...params, lang: getCurrentLanguage() })
+function loadForecast(params) {
+  fetchForecast({ ...params, lang: getCurrentLanguage() })
     .then(renderForecast)
     .catch((err) => showToast(err.message || 'Failed to load forecast', 'error'));
 }
@@ -434,7 +431,7 @@ function renderCapitals(page, perPage, searchTerm) {
       return;
     }
 
-    fetchWeatherApi('/weather', { lat, lon, lang: getCurrentLanguage() }, { signal })
+    fetchCurrentWeather({ lat, lon, lang: getCurrentLanguage(), signal })
       .then((weather) => {
         if (token !== capitalsRequestToken) return;
         capitalsWeatherCache[cacheKey] = weather;
@@ -466,7 +463,7 @@ function renderCapitals(page, perPage, searchTerm) {
 }
 
 function showCapitalDetails(capital, country, lat, lon) {
-  fetchWeatherApi('/weather', { lat, lon, lang: getCurrentLanguage() })
+  fetchCurrentWeather({ lat, lon, lang: getCurrentLanguage() })
     .then((weather) => {
       const conditions = readConditions(weather);
       const modalBody = document.getElementById('capitalModalBody');

@@ -1,158 +1,120 @@
-# WeatherHub – Smart Weather Application
+# Weather Hub
 
-## Overview
-A modern weather web app with real-time forecasts, an interactive map, multi-language support, user profiles, and world capitals weather.
-
-## Tech Stack
-- **Frontend:** Vite, vanilla JavaScript (ES modules), CSS
-- **Backend:** Firebase Cloud Functions (API proxy for all third-party keys)
-- **Auth & Database:** Firebase Auth + Realtime Database
-- **Hosting:** Firebase Hosting
+A weather dashboard with an interactive map, multi-language support, and Firebase
+authentication. It runs entirely on free services — **no credit card is required
+anywhere**, including for Firebase.
 
 ## Architecture
 
-Every third-party API key lives server-side as a Firebase Functions secret. The browser
-only ever talks to `/api/*`, which Firebase Hosting rewrites to the `api` function. The
-one exception is the Maps JavaScript API, which must run in the browser, so its
-referrer-restricted key is served at runtime by `GET /api/config/public`.
+The app is a static site. There is no backend: the browser calls each provider
+directly, which is what allows it to run on the Firebase **Spark (free)** plan,
+where Cloud Functions are unavailable.
 
-```
-Browser ──> Firebase Hosting ──/api/**──> Cloud Function "api" ──> OpenWeather
-                                                                └─> Google Translate
-                                                                └─> Google Geocoding
-Browser ──> Maps JavaScript API (browser key from /api/config/public)
-Browser ──> Firebase Auth + Realtime Database (client SDK)
-```
+| Feature | Provider | Key needed? | Card needed? |
+| --- | --- | --- | --- |
+| Current weather, 5-day forecast, reverse geocoding | OpenWeather free tier | Yes | No |
+| UV index | Open-Meteo | No | No |
+| Map tiles | OpenStreetMap via Leaflet | No | No |
+| Place search | Open-Meteo Geocoding | No | No |
+| Translation | MyMemory | No | No |
+| Country and capital data | restcountries.com | No | No |
+| Auth, profiles, contact messages | Firebase (Spark plan) | Yes | No |
 
-## External APIs
+### Why no backend
 
-| API | Where it runs | Credential |
-|-----|---------------|------------|
-| OpenWeather 2.5 (weather, forecast) | Cloud Function | `OPENWEATHER_API_KEY` |
-| OpenWeather One Call 3.0 (UV index) | Cloud Function | `OPENWEATHER_API_KEY` |
-| Google Cloud Translation v2 | Cloud Function | `GOOGLE_TRANSLATE_API_KEY` |
-| Google Geocoding | Cloud Function | `GOOGLE_MAPS_SERVER_KEY` |
-| Google Maps JavaScript + Places | Browser | `GOOGLE_MAPS_API_KEY` |
-| restcountries.com (capital list) | Browser | none, public |
+Google Maps and Google Cloud Translation both require a billing account with a
+payment method on file, even to stay inside their free tiers. Firebase Cloud
+Functions require the Blaze plan for the same reason. Swapping those three for
+Leaflet, Open-Meteo, and MyMemory removes the card requirement entirely.
 
-UV index requires a One Call 3.0 subscription. Without one the endpoint returns
-`{ available: false }` and the UI hides the tile rather than showing a dead value.
+The trade-off is that the OpenWeather key ships in the client bundle, since
+there is no server to hide it behind. This is acceptable specifically because a
+free-tier OpenWeather key **cannot generate charges** — the worst case is that
+someone consumes your rate limit, and you rotate the key. Never put a key that
+can incur costs in this project.
+
+The `functions/` directory contains an earlier Cloud Functions backend. It is no
+longer referenced by `firebase.json` and is not deployed. It is kept only as a
+starting point should you later upgrade to Blaze and want server-side key
+handling.
 
 ## Prerequisites
 
-1. The Firebase project must be on the **Blaze** plan. Cloud Functions and Secret
-   Manager are unavailable on Spark.
-2. Enable these APIs in Google Cloud Console: **Maps JavaScript API**,
-   **Places API (New)**, **Geocoding API**, **Cloud Translation API**.
-3. Create two Google Maps keys. One key cannot be correctly restricted for both uses:
-   - **Browser key** — restrict by HTTP referrer to your hosting domain and `localhost:5173`.
-   - **Server key** — restrict to the Geocoding API only.
+- Node.js 20 or newer
+- A Firebase project with Email/Password auth and Realtime Database enabled
+- A free OpenWeather API key
 
-## Quick Start
+## Getting an OpenWeather key
+
+1. Sign up at <https://home.openweathermap.org/users/sign_up> using only an email.
+2. Confirm the verification email.
+3. Copy the key from <https://home.openweathermap.org/api_keys>.
+
+New keys take **10 minutes to 2 hours** to activate. Until then every request
+returns HTTP 401. This is normal, and the app reports it explicitly rather than
+showing a generic failure.
+
+## Quick start
 
 ```bash
 npm install
-cp .env.example .env.local   # optional; Firebase defaults are committed
-```
-
-Set the server-side secrets (never commit these):
-
-```bash
-firebase functions:secrets:set OPENWEATHER_API_KEY
-firebase functions:secrets:set GOOGLE_TRANSLATE_API_KEY
-firebase functions:secrets:set GOOGLE_MAPS_API_KEY      # browser key
-firebase functions:secrets:set GOOGLE_MAPS_SERVER_KEY   # geocoding key
-```
-
-### Run locally
-
-```bash
-# Terminal 1 — Firebase emulators (hosting on :5000 rewrites /api to the function)
-firebase emulators:start
-
-# Terminal 2 — Vite dev server, proxies /api to :5000
+cp .env.example .env.local   # then set VITE_OPENWEATHER_API_KEY
 npm run dev
 ```
 
-Open http://localhost:5173
+Firebase settings default to `src/js/firebase-config.js` and can be overridden
+with the `VITE_FIREBASE_*` variables in `.env.local`.
 
-### Production build and deploy
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Vite dev server with hot reload |
+| `npm run build` | Production build into `dist/` |
+| `npm run preview` | Serve the production build locally |
+| `npm run test:api` | Check every external provider end to end |
+
+`npm run test:api` calls the real provider endpoints and reports each one
+individually, which makes it the fastest way to tell an inactive API key apart
+from a genuine outage.
+
+## Deploying
 
 ```bash
 npm run build
-firebase deploy --only hosting,functions,database
+firebase deploy --only hosting,database
 ```
 
-### Verify the deployment
+Only hosting and database rules are deployed; both are available on the Spark
+plan.
 
-```bash
-npm run test:api                                  # against production
-node scripts/api-smoke-test.mjs http://localhost:5000   # against the emulator
-```
+## Language support
 
-The suite covers valid and invalid cities, out-of-range coordinates, language
-round-trips, batch translation, HTML-entity handling, geocoding edge cases, method
-rejection, and rate limiting.
+English, Arabic, Malay, Tamil, Hindi, and Simplified Chinese. Arabic switches
+the document to right-to-left.
 
-## API Endpoints
+Weather descriptions are requested from OpenWeather in the target language where
+it supports one. Malay and Tamil are not supported by OpenWeather, so those fall
+back to MyMemory translation.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Status plus which keys are configured (booleans only) |
-| `/api/config/public` | GET | Browser Maps key and Map ID |
-| `/api/weather` | GET | Current weather (`?lat=&lon=` or `?city=`, optional `&lang=`) |
-| `/api/forecast` | GET | 5-day/3-hour forecast (same parameters) |
-| `/api/uv` | GET | UV index via One Call 3.0 (`?lat=&lon=`) |
-| `/api/reverse-geocode` | GET | Google reverse geocoding (`?lat=&lon=`) |
-| `/api/translate` | GET/POST | Translate a string or array (`{ text, target, source? }`) |
-| `/api/contact` | POST | Store a contact message (`{ name, email, message }`) |
+MyMemory's free tier is metered in words per day and accepts one string per
+request, so translations are cached in `sessionStorage` and fetched with bounded
+concurrency. Repeated language switches within a session cost no further quota.
 
-Every upstream call has a 6–8 second timeout, one retry with jittered backoff on
-transient failures, and structured JSON logging to Cloud Logging.
+## Rate limits to be aware of
 
-Rate limits per IP per minute: 120 default, 30 translate, 5 contact. The limiter is
-in-memory per function instance, so limits are approximate across concurrent
-instances; `maxInstances` is capped at 10 to bound this.
+| Provider | Limit |
+| --- | --- |
+| OpenWeather free | 60 calls/minute, 1,000,000 calls/month |
+| Open-Meteo | ~10,000 calls/day, non-commercial use |
+| MyMemory | 5,000 words/day per IP anonymously |
+| OpenStreetMap tiles | Fair-use policy; heavy traffic needs your own tile host |
 
-## Languages
+## Security notes
 
-English, Arabic, Malay, Chinese, Tamil, and Hindi. The choice persists in
-`localStorage`, Arabic switches the document to RTL, and translations are cached in
-`sessionStorage` so only cache misses reach the API. OpenWeather localises weather
-descriptions natively for Arabic, Chinese, and Hindi; Malay and Tamil fall back to
-English upstream and are then translated by Google.
-
-## Project Structure
-
-```
-src/
-├── js/
-│   ├── api.js          # API client: timeouts, abort signals, error normalisation
-│   ├── auth.js         # Firebase auth helpers
-│   ├── config.js       # Env-based configuration
-│   ├── firebase.js     # Firebase SDK initialisation
-│   ├── i18n.js         # Language list, persistence, text direction
-│   ├── translate.js    # Translation with sessionStorage cache
-│   ├── weather.js      # Weather dashboard
-│   ├── map.js          # Google Maps (AdvancedMarker, PlaceAutocomplete)
-│   ├── nav.js          # Auth-aware navigation
-│   ├── ui.js           # Loader, toast, theme, tabs
-│   └── components/nav.js
-├── pages/              # One entry point per HTML file
-└── styles/main.css
-
-functions/
-├── handlers/           # weather, translate, geocode, contact, config
-├── lib/                # httpClient, rateLimit, validators, response, firebaseAdmin
-└── index.js            # Router, CORS allowlist, secret wiring
-```
-
-## CI/CD
-
-GitHub Actions builds and deploys on push to `master`. Hosting and database rules
-deploy first and independently of Cloud Functions, so a functions failure cannot take
-the site down. Requires the repository secret
-`FIREBASE_SERVICE_ACCOUNT_WEATHER_HUB_5CCBB`.
-
-## Author
-Abbas Usman Adamu
+- Realtime Database rules restrict each user to their own `users/$uid` record.
+- `contactMessages` is write-only and create-only: the browser can submit a
+  message but cannot read, edit, or delete any. Every field is validated
+  server-side by the rules, including email format and length caps.
+- `.env.local` is gitignored. Remember that anything prefixed `VITE_` is embedded
+  into the public bundle at build time.
