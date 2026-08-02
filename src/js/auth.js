@@ -33,9 +33,29 @@ export async function registerUser(email, password, username, phone, callback) {
     if (typeof callback === 'function') callback(null);
     return user;
   } catch (error) {
-    if (typeof callback === 'function') callback(error);
-    throw error;
+    const friendly = friendlyAuthError(error);
+    if (typeof callback === 'function') callback(friendly);
+    throw friendly;
   }
+}
+
+function friendlyAuthError(error) {
+  const code = error?.code || '';
+  const messages = {
+    'auth/email-already-in-use': 'This email is already registered. Try logging in.',
+    'auth/invalid-email': 'Please enter a valid email address.',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+    'auth/user-not-found': 'No account found with this email.',
+    'auth/wrong-password': 'Incorrect password. Please try again.',
+    'auth/invalid-credential': 'Invalid email or password.',
+    'auth/operation-not-allowed': 'Email/password sign-in is not enabled. Enable it in Firebase Console → Authentication → Sign-in method.',
+    'auth/network-request-failed': 'Network error. Check your internet connection.',
+    'PERMISSION_DENIED': 'Could not save profile. Check Realtime Database rules are deployed for this project.'
+  };
+  if (messages[code]) {
+    return new Error(messages[code]);
+  }
+  return error;
 }
 
 export async function loginUser(email, password, callback) {
@@ -52,8 +72,9 @@ export async function loginUser(email, password, callback) {
     if (typeof callback === 'function') callback(null);
     return userCredential.user;
   } catch (error) {
-    if (typeof callback === 'function') callback(error);
-    throw error;
+    const friendly = friendlyAuthError(error);
+    if (typeof callback === 'function') callback(friendly);
+    throw friendly;
   }
 }
 
