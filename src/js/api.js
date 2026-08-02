@@ -6,6 +6,7 @@
 import { getCurrentWeather, getForecast, reverseGeocode } from './providers/openweather.js';
 import { getUvIndex } from './providers/openMeteo.js';
 import { translateTexts } from './providers/myMemory.js';
+import { getWeatherGif } from './providers/giphy.js';
 import { getDatabase } from './firebase.js';
 
 export { ApiError } from './providers/http.js';
@@ -28,6 +29,10 @@ export function fetchUvIndex(lat, lon, options) {
 
 export function fetchTranslation(texts, source, target, options) {
   return translateTexts(texts, source, target, options);
+}
+
+export function fetchWeatherGif(condition, options) {
+  return getWeatherGif(condition, options);
 }
 
 /**

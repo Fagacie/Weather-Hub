@@ -17,7 +17,8 @@ where Cloud Functions are unavailable.
 | Map tiles | OpenStreetMap via Leaflet | No | No |
 | Place search | Open-Meteo Geocoding | No | No |
 | Translation | MyMemory | No | No |
-| Country and capital data | restcountries.com | No | No |
+| Weather GIF (optional) | Giphy beta key | Yes | No |
+| Country and capital data | Bundled, see `src/data/capitals.json` | No | No |
 | Auth, profiles, contact messages | Firebase (Spark plan) | Yes | No |
 
 ### Why no backend
@@ -53,6 +54,23 @@ handling.
 New keys take **10 minutes to 2 hours** to activate. Until then every request
 returns HTTP 401. This is normal, and the app reports it explicitly rather than
 showing a generic failure.
+
+## Getting a Giphy key (optional)
+
+The home page shows a GIF matching the current weather. This is optional: with
+no key the panel stays hidden and nothing else changes.
+
+Create a free beta key at <https://developers.giphy.com/dashboard/>, choosing
+the API option rather than the SDK. No credit card, and it works immediately.
+
+Beta keys are limited to **100 calls per hour**, which shapes the design. The
+lookup is keyed on the OpenWeather condition rather than on location, so the
+app only ever needs one request per distinct condition, cached in
+`localStorage` for 24 hours. The World Capitals list and the forecast tiles use
+OpenWeather's own icons and never call Giphy — fetching a GIF per card would
+exhaust the hourly quota in a single page load.
+
+All requests send `rating=g`.
 
 ## Quick start
 
@@ -108,6 +126,7 @@ concurrency. Repeated language switches within a session cost no further quota.
 | OpenWeather free | 60 calls/minute, 1,000,000 calls/month |
 | Open-Meteo | ~10,000 calls/day, non-commercial use |
 | MyMemory | 5,000 words/day per IP anonymously |
+| Giphy beta key | 100 calls/hour; mitigated by 24h condition-keyed caching |
 | OpenStreetMap tiles | Fair-use policy; heavy traffic needs your own tile host |
 
 ## Security notes

@@ -11,6 +11,9 @@ export function getConfig() {
     // Public by necessity: with no backend, the browser calls OpenWeather
     // directly. A free-tier key cannot incur charges, only rate limits.
     OPENWEATHER_API_KEY: pick(import.meta.env.VITE_OPENWEATHER_API_KEY, ''),
+    // Optional. A Giphy beta key is free and rate limited; when absent the
+    // weather GIF panel simply stays hidden.
+    GIPHY_API_KEY: pick(import.meta.env.VITE_GIPHY_API_KEY, ''),
     FIREBASE_CONFIG: {
       apiKey: pick(import.meta.env.VITE_FIREBASE_API_KEY, FIREBASE_CONFIG.apiKey),
       authDomain: pick(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, FIREBASE_CONFIG.authDomain),

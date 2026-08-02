@@ -1,4 +1,10 @@
-import { fetchCurrentWeather, fetchForecast, fetchReverseGeocode, fetchUvIndex } from './api.js';
+import {
+  fetchCurrentWeather,
+  fetchForecast,
+  fetchReverseGeocode,
+  fetchUvIndex,
+  fetchWeatherGif
+} from './api.js';
 import { translate, translateAll, getCurrentLanguage, onLanguageChange } from './translate.js';
 import { showLoader, showToast, initModal } from './ui.js';
 import {
@@ -17,6 +23,7 @@ let capitalModalControls = null;
 let capitalsRequestToken = 0;
 let capitalsAbortController = null;
 let lastLocation = null;
+let gifRequestToken = 0;
 
 function setWeatherBackground(weather) {
   const classes = ['weather-clear', 'weather-clouds', 'weather-rain', 'weather-thunderstorm', 'weather-snow', 'weather-mist'];
@@ -50,6 +57,54 @@ function setAnimatedWeatherIcon(weather) {
 
   const key = (weather || '').toLowerCase();
   iconDiv.innerHTML = icons[key] || icons.clear;
+}
+
+/**
+ * Shows a GIF matching the current condition. Deliberately never rejects and is
+ * never awaited by the caller, so a slow or failing Giphy request cannot delay
+ * or break the weather readout. The panel stays hidden unless an image loads.
+ */
+async function setWeatherGif(condition) {
+  const figure = document.getElementById('weatherGif');
+  const img = document.getElementById('weatherGifImg');
+  if (!figure || !img) return;
+
+  gifRequestToken += 1;
+  const token = gifRequestToken;
+
+  const hide = () => {
+    figure.hidden = true;
+    img.removeAttribute('src');
+  };
+
+  // An autoplaying GIF is exactly what this setting asks us not to render.
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    hide();
+    return;
+  }
+
+  const url = await fetchWeatherGif(condition);
+
+  // A newer location or language change already superseded this request.
+  if (token !== gifRequestToken) return;
+
+  if (!url) {
+    hide();
+    return;
+  }
+
+  // Only reveal once the image is decoded, so a broken URL never shows a
+  // placeholder and the layout does not shift mid-load.
+  img.onload = () => {
+    if (token !== gifRequestToken) return;
+    img.alt = `${condition} weather`;
+    figure.hidden = false;
+  };
+  img.onerror = () => {
+    if (token !== gifRequestToken) return;
+    hide();
+  };
+  img.src = url;
 }
 
 /**
@@ -130,6 +185,9 @@ async function displayWeatherData(data) {
 
   setWeatherBackground(conditions.main);
   setAnimatedWeatherIcon(conditions.main);
+  // Intentionally not awaited: the GIF is decorative and must never hold up
+  // the temperature, forecast, or alerts.
+  setWeatherGif(conditions.main);
   checkSevereWeatherAlerts(data);
 
   // OpenWeather has no description for some languages, so translate as a backstop.

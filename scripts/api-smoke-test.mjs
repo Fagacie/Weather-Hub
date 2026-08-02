@@ -26,12 +26,19 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const OPENWEATHER_KEY = process.env.VITE_OPENWEATHER_API_KEY || '';
+const GIPHY_KEY = process.env.VITE_GIPHY_API_KEY || '';
 const results = [];
 
 function record(name, ok, detail) {
   results.push({ name, ok, detail });
   const label = ok ? 'PASS' : 'FAIL';
   console.log(`${label}  ${name}${detail ? ` — ${detail}` : ''}`);
+}
+
+// Giphy is optional, so an absent key is reported without failing the suite.
+function skip(name, detail) {
+  results.push({ name, ok: true, skipped: true, detail });
+  console.log(`SKIP  ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
 async function check(name, fn) {
@@ -43,8 +50,29 @@ async function check(name, fn) {
   }
 }
 
+/**
+ * Retries only connection-level failures, never HTTP statuses, so a flaky local
+ * network cannot be mistaken for a provider regression. An endpoint that is
+ * genuinely down still fails after exhausting the attempts.
+ */
+async function fetchWithRetry(url, attempts = 3) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetch(url, { signal: AbortSignal.timeout(15000) });
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+  }
+
+  const cause = lastError?.cause?.code || lastError?.message || 'unknown';
+  throw new Error(`network failure after ${attempts} attempts (${cause})`);
+}
+
 async function getJson(url, label) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const response = await fetchWithRetry(url);
   const text = await response.text();
 
   let data;
@@ -144,16 +172,55 @@ async function run() {
     return `${place.name}, ${place.country}`;
   });
 
-  await check('OpenStreetMap tile server', async () => {
-    const response = await fetch('https://tile.openstreetmap.org/10/512/512.png', {
-      signal: AbortSignal.timeout(15000)
+  if (!GIPHY_KEY) {
+    skip('Giphy weather GIF', 'VITE_GIPHY_API_KEY not set; the GIF panel stays hidden');
+  } else {
+    await check('Giphy search returns a usable GIF (rating=g)', async () => {
+      const params = new URLSearchParams({
+        api_key: GIPHY_KEY,
+        q: 'sunny day',
+        limit: '10',
+        rating: 'g',
+        lang: 'en'
+      });
+      const { response, data } = await getJson(`https://api.giphy.com/v1/gifs/search?${params}`, 'Giphy');
+
+      if (response.status === 401 || response.status === 403) throw new Error('key rejected by Giphy');
+      if (response.status === 429) throw new Error('429 — beta key limit is 100 calls/hour');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const url = data?.data?.[0]?.images?.fixed_height?.url;
+      if (!url) throw new Error('no fixed_height URL in response');
+      if (!url.startsWith('https://')) throw new Error('URL is not https');
+
+      const offRating = (data.data || []).find((g) => !['g', 'y'].includes(String(g.rating).toLowerCase()));
+      if (offRating) throw new Error(`rating filter leaked "${offRating.rating}"`);
+
+      return `${data.data.length} results, all rated g`;
     });
+
+    await check('Giphy handles an invalid key without throwing', async () => {
+      const params = new URLSearchParams({ api_key: 'invalid-key-smoke-test', q: 'rain', limit: '1', rating: 'g' });
+      const { response, data } = await getJson(`https://api.giphy.com/v1/gifs/search?${params}`, 'Giphy');
+
+      const metaStatus = Number(data?.meta?.status);
+      const rejected = !response.ok || (Number.isFinite(metaStatus) && metaStatus >= 400);
+      if (!rejected) throw new Error('an invalid key was accepted');
+
+      return `rejected with HTTP ${response.status}, handled as no-GIF`;
+    });
+  }
+
+  await check('OpenStreetMap tile server', async () => {
+    const response = await fetchWithRetry('https://tile.openstreetmap.org/10/512/512.png');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return `tile ok (${response.headers.get('content-type')})`;
   });
 
   const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+  const skipped = results.filter((r) => r.skipped).length;
+  const passed = results.length - failed.length - skipped;
+  console.log(`\n${passed}/${results.length - skipped} checks passed${skipped ? ` (${skipped} skipped)` : ''}`);
 
   if (failed.length) {
     console.log('\nFailed checks:');
