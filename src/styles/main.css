@@ -452,14 +452,18 @@ body.dark-mode.weather-mist {
 
 .weather-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  /* minmax(0, ...) lets columns shrink; plain 1fr refuses to go below its
+     content and pushes the forecast panel off-screen. */
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 1.25rem;
   align-items: start;
 }
 
-@media (max-width: 1024px) {
+/* Stays two-column at 1024px, which is what a 1280px display reports at the
+   125% scaling Windows sets by default. */
+@media (max-width: 900px) {
   .weather-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -474,7 +478,7 @@ body.dark-mode.weather-mist {
    =================================================== */
 
 .weather-hero {
-  padding: 2.5rem;
+  padding: clamp(1.25rem, 2.5vw, 2.25rem);
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -507,7 +511,7 @@ body.dark-mode.weather-mist {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 96px;
+  height: clamp(56px, 7vw, 88px);
   margin-bottom: 0.5rem;
 }
 #animatedWeatherIcon svg {
@@ -515,9 +519,9 @@ body.dark-mode.weather-mist {
 }
 
 .weather-temp-display {
-  font-size: 5rem;
+  font-size: clamp(2.75rem, 5.5vw, 4.5rem);
   font-weight: 800;
-  letter-spacing: -3px;
+  letter-spacing: -2px;
   line-height: 1;
   margin-bottom: 0.25rem;
   background: linear-gradient(180deg, var(--text-primary) 0%, var(--text-secondary) 100%);
@@ -527,7 +531,7 @@ body.dark-mode.weather-mist {
 }
 
 .weather-desc {
-  font-size: 1.25rem;
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
   font-weight: 500;
   color: var(--text-secondary);
   text-transform: capitalize;
@@ -537,7 +541,7 @@ body.dark-mode.weather-mist {
 .weather-date {
   font-size: 0.85rem;
   color: var(--text-muted);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 /* Stat pills */
@@ -860,6 +864,7 @@ body.dark-mode.weather-mist {
 .horizontal-scroll {
   display: flex;
   flex-wrap: nowrap;
+  align-items: stretch;
   overflow-x: auto;
   gap: 0.75rem;
   padding-bottom: 0.75rem;
@@ -883,9 +888,13 @@ body.dark-mode.weather-mist {
 .nearby-card,
 .capital-card {
   flex: 0 0 auto;
-  min-width: 200px;
-  max-width: 240px;
-  padding: 1rem;
+  /* Column layout keeps the map button on the baseline when a long country
+     name wraps onto a second line. */
+  display: flex;
+  flex-direction: column;
+  min-width: 175px;
+  max-width: 210px;
+  padding: 0.875rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
@@ -914,6 +923,8 @@ body.dark-mode.weather-mist {
 .capital-card .map-link {
   display: inline-flex;
   align-items: center;
+  align-self: center;
+  margin-top: auto;
   gap: 0.375rem;
   padding: 0.375rem 0.75rem;
   background: rgba(6, 182, 212, 0.15);
@@ -1564,10 +1575,6 @@ body.dark-mode.weather-mist {
    =================================================== */
 
 @media (max-width: 480px) {
-  .weather-temp-display {
-    font-size: 3.5rem;
-    letter-spacing: -2px;
-  }
   .stat-pills {
     gap: 0.5rem;
   }
