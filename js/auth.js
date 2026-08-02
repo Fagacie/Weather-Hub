@@ -2,53 +2,84 @@ function isFirebaseReady() {
   return typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0;
 }
 
-// Register a new user
-function registerUser(email, password, username, phone, callback) {
+// Register a new user with input sanitization and Promise/Callback dual support
+async function registerUser(email, password, username, phone, callback) {
   if (!isFirebaseReady()) {
-    callback(new Error('Firebase config is not configured.'));
-    return;
+    const err = new Error('Firebase is not configured yet. Please add your Firebase credentials in js/config.js');
+    if (typeof callback === 'function') callback(err);
+    throw err;
   }
-  firebase.auth().createUserWithEmailAndPassword(email, password)
-    .then(userCredential => {
-      const user = userCredential.user;
-      // Save extra info to database
-      return firebase.database().ref('users/' + user.uid).set({
-        email: email,
-        username: username,
-        phone: phone,
-        createdAt: new Date().toISOString() // <-- this line is important
-      });
-    })
-    .then(() => callback(null))
-    .catch(error => callback(error));
+
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanUsername = (username || '').trim();
+  const cleanPhone = (phone || '').trim();
+
+  if (!cleanEmail || !password || !cleanUsername) {
+    const err = new Error('Please fill in all required fields.');
+    if (typeof callback === 'function') callback(err);
+    throw err;
+  }
+
+  try {
+    const userCredential = await firebase.auth().createUserWithEmailAndPassword(cleanEmail, password);
+    const user = userCredential.user;
+
+    await firebase.database().ref('users/' + user.uid).set({
+      email: cleanEmail,
+      username: cleanUsername,
+      phone: cleanPhone,
+      createdAt: new Date().toISOString()
+    });
+
+    if (typeof callback === 'function') callback(null);
+    return user;
+  } catch (error) {
+    if (typeof callback === 'function') callback(error);
+    throw error;
+  }
 }
 
 // Login user
-function loginUser(email, password, callback) {
+async function loginUser(email, password, callback) {
   if (!isFirebaseReady()) {
-    callback(new Error('Firebase config is not configured.'));
-    return;
+    const err = new Error('Firebase is not configured yet. Please add your Firebase credentials in js/config.js');
+    if (typeof callback === 'function') callback(err);
+    throw err;
   }
-  firebase.auth().signInWithEmailAndPassword(email, password)
-    .then(() => callback(null))
-    .catch(error => callback(error));
+
+  const cleanEmail = (email || '').trim().toLowerCase();
+
+  try {
+    const userCredential = await firebase.auth().signInWithEmailAndPassword(cleanEmail, password);
+    if (typeof callback === 'function') callback(null);
+    return userCredential.user;
+  } catch (error) {
+    if (typeof callback === 'function') callback(error);
+    throw error;
+  }
 }
 
 // Logout user
-function logoutUser(callback) {
+async function logoutUser(callback) {
   if (!isFirebaseReady()) {
-    callback(new Error('Firebase config is not configured.'));
-    return;
+    const err = new Error('Firebase is not initialized.');
+    if (typeof callback === 'function') callback(err);
+    throw err;
   }
-  firebase.auth().signOut()
-    .then(() => callback(null))
-    .catch(error => callback(error));
+
+  try {
+    await firebase.auth().signOut();
+    if (typeof callback === 'function') callback(null);
+  } catch (error) {
+    if (typeof callback === 'function') callback(error);
+    throw error;
+  }
 }
 
 // Listen for auth state changes
 function onAuthStateChanged(callback) {
   if (!isFirebaseReady()) {
-    callback(null);
+    if (typeof callback === 'function') callback(null);
     return;
   }
   firebase.auth().onAuthStateChanged(callback);

@@ -1,21 +1,5 @@
-const WEATHER_API_BASE_URL = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.WEATHER_API_BASE_URL) || '/api';
-
-function buildWeatherApiUrl(endpoint, params) {
-  const query = new URLSearchParams(params);
-  const base = WEATHER_API_BASE_URL.replace(/\/$/, '');
-  return base + endpoint + '?' + query.toString();
-}
-
 function fetchWeatherApi(endpoint, params) {
   return fetch(buildWeatherApiUrl(endpoint, params)).then(parseWeatherResponse);
-}
-
-function formatDate(dt) {
-  return new Date(dt * 1000).toLocaleDateString(undefined, {weekday:'long', day:'2-digit', month:'short', year:'numeric'});
-}
-
-function formatWindSpeed(ms) {
-  return Math.round(ms * 3.6) + ' km/h';
 }
 
 function setWeatherBackground(weather) {
@@ -75,6 +59,7 @@ function checkSevereWeatherAlerts(data) {
   const content = document.getElementById('weatherAlertContent');
   if (!card || !content) return;
 
+  content.textContent = '';
   const alerts = [];
   const temp = data.main.temp;
   const wind = data.wind.speed;
@@ -85,45 +70,43 @@ function checkSevereWeatherAlerts(data) {
     alerts.push({
       event: 'Thunderstorm Advisory',
       description: 'Thunderstorm conditions detected. Seek shelter if necessary.',
-      start: now,
-      end: now + 3600
+      start: now
     });
   }
   if (temp >= 38) {
     alerts.push({
       event: 'Extreme Heat Advisory',
       description: 'Temperature is ' + Math.round(temp) + '°C. Stay hydrated and limit outdoor activity.',
-      start: now,
-      end: now + 3600
+      start: now
     });
   }
   if (temp <= -5) {
     alerts.push({
       event: 'Extreme Cold Advisory',
       description: 'Temperature is ' + Math.round(temp) + '°C. Dress warmly and limit exposure.',
-      start: now,
-      end: now + 3600
+      start: now
     });
   }
   if (wind >= 15) {
     alerts.push({
       event: 'High Wind Advisory',
       description: 'Wind speed is ' + formatWindSpeed(wind) + '. Secure loose objects outdoors.',
-      start: now,
-      end: now + 3600
+      start: now
     });
   }
 
+  card.style.display = '';
   if (alerts.length > 0) {
-    card.style.display = '';
     const alert = alerts[0];
-    content.innerHTML =
-      '<div class="fw-bold mb-1">' + alert.event + '</div>' +
-      '<div class="mb-1">' + alert.description + '</div>' +
-      '<div class="small text-muted">Detected at ' + new Date(alert.start * 1000).toLocaleString() + '</div>';
+    const eventDiv = createElementWithText('div', alert.event, 'fw-bold mb-1');
+    const descDiv = createElementWithText('div', alert.description, 'mb-1');
+    const timeDiv = createElementWithText('div', 'Detected at ' + new Date(alert.start * 1000).toLocaleString(), 'small text-muted');
+    content.appendChild(eventDiv);
+    content.appendChild(descDiv);
+    content.appendChild(timeDiv);
   } else {
-    card.style.display = '';
-    content.innerHTML = '<span class="text-success">No severe weather conditions detected for your area.</span>';
+    const successSpan = createElementWithText('span', 'No severe weather conditions detected for your area.', 'text-success');
+    content.appendChild(successSpan);
   }
 }
 
@@ -165,8 +148,7 @@ function parseWeatherResponse(res) {
 
 // --- Reverse Geocoding ---
 function getLocationName(lat, lon, callback) {
-  fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json')
-    .then(function(res) { return res.json(); })
+  fetchWeatherApi('/reverse-geocode', { lat: lat, lon: lon })
     .then(function(data) {
       callback(data && data.display_name ? data.display_name : null);
     })
@@ -237,18 +219,26 @@ function fetchForecastByCity(city) {
 }
 
 function renderForecast(data) {
-  let hourlyHtml = '';
-  data.list.slice(0, 8).forEach(function(item) {
-    hourlyHtml +=
-      '<div class="text-center">' +
-      '<div>' + new Date(item.dt_txt).getHours() + ':00</div>' +
-      '<img src="https://openweathermap.org/img/wn/' + item.weather[0].icon + '.png" width="40">' +
-      '<div>' + Math.round(item.main.temp) + '°C</div>' +
-      '</div>';
-  });
-  document.getElementById('hourlyForecast').innerHTML = hourlyHtml;
+  const hourlyDiv = document.getElementById('hourlyForecast');
+  hourlyDiv.textContent = '';
 
-  let forecastIcons = '';
+  data.list.slice(0, 8).forEach(function(item) {
+    const card = createElementWithText('div', '', 'text-center');
+    const timeEl = createElementWithText('div', new Date(item.dt_txt).getHours() + ':00');
+    const imgEl = document.createElement('img');
+    const iconCode = escapeHTML(item.weather[0].icon);
+    imgEl.src = 'https://openweathermap.org/img/wn/' + iconCode + '.png';
+    imgEl.width = 40;
+    const tempEl = createElementWithText('div', Math.round(item.main.temp) + '°C');
+
+    card.appendChild(timeEl);
+    card.appendChild(imgEl);
+    card.appendChild(tempEl);
+    hourlyDiv.appendChild(card);
+  });
+
+  const iconsDiv = document.getElementById('forecastIcons');
+  iconsDiv.textContent = '';
   const days = {};
   data.list.forEach(function(item) {
     const date = item.dt_txt.split(' ')[0];
@@ -257,10 +247,15 @@ function renderForecast(data) {
       days[date] = item;
     }
   });
+
   Object.values(days).slice(0, 5).forEach(function(item) {
-    forecastIcons += '<img src="https://openweathermap.org/img/wn/' + item.weather[0].icon + '.png" width="32" title="' + item.weather[0].main + '">';
+    const imgEl = document.createElement('img');
+    const iconCode = escapeHTML(item.weather[0].icon);
+    imgEl.src = 'https://openweathermap.org/img/wn/' + iconCode + '.png';
+    imgEl.width = 32;
+    imgEl.title = item.weather[0].main;
+    iconsDiv.appendChild(imgEl);
   });
-  document.getElementById('forecastIcons').innerHTML = forecastIcons;
 
   if (data.list && data.list.length) {
     const chanceOfRain = data.list[0].pop !== undefined ? Math.round(data.list[0].pop * 100) + '%' : '--';
@@ -301,7 +296,9 @@ function fetchAllCapitalsWeather(page, perPage, searchTerm) {
   searchTerm = searchTerm || '';
 
   const container = document.getElementById('nearbyPlaces');
-  container.innerHTML = '<div class="w-100 text-center py-3">Loading world capitals weather...</div>';
+  container.textContent = '';
+  const loadingDiv = createElementWithText('div', 'Loading world capitals weather...', 'w-100 text-center py-3');
+  container.appendChild(loadingDiv);
   document.getElementById('capitalsCount').textContent = '';
 
   if (allCapitals.length === 0) {
@@ -317,7 +314,9 @@ function fetchAllCapitalsWeather(page, perPage, searchTerm) {
         renderCapitals(page, perPage, searchTerm);
       })
       .catch(function() {
-        container.innerHTML = '<div class="w-100 text-center py-3 text-danger">Failed to load capitals data.</div>';
+        container.textContent = '';
+        const errDiv = createElementWithText('div', 'Failed to load capitals data.', 'w-100 text-center py-3 text-danger');
+        container.appendChild(errDiv);
       });
   } else {
     renderCapitals(page, perPage, searchTerm);
@@ -326,6 +325,8 @@ function fetchAllCapitalsWeather(page, perPage, searchTerm) {
 
 function renderCapitals(page, perPage, searchTerm) {
   const container = document.getElementById('nearbyPlaces');
+  container.textContent = '';
+
   let filtered = allCapitals;
   if (searchTerm) {
     const term = searchTerm.toLowerCase();
@@ -336,61 +337,84 @@ function renderCapitals(page, perPage, searchTerm) {
   const totalCapitals = filtered.length;
   const start = (page - 1) * perPage;
   const end = start + perPage;
-  let shown = 0;
-  let html = '';
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="w-100 text-center py-3 text-muted">No results found.</div>';
+    const emptyDiv = createElementWithText('div', 'No results found.', 'w-100 text-center py-3 text-muted');
+    container.appendChild(emptyDiv);
     document.getElementById('capitalsCount').textContent = '';
     return;
   }
 
-  html += '<div class="horizontal-scroll">';
-  filtered.slice(start, end).forEach(function(country) {
+  const scrollWrapper = createElementWithText('div', '', 'horizontal-scroll');
+  const sliced = filtered.slice(start, end);
+
+  sliced.forEach(function(country) {
     const lat = country.latlng[0];
     const lon = country.latlng[1];
     const capital = country.capital[0];
     const countryName = country.name.common;
     const cacheKey = capital + ',' + countryName;
-    html +=
-      '<div class="frosted nearby-card p-2 text-center capital-card mx-1"' +
-      ' data-capital="' + capital + '"' +
-      ' data-country="' + countryName + '"' +
-      ' data-lat="' + lat + '"' +
-      ' data-lon="' + lon + '">' +
-      '<div class="fw-bold">' + capital + ', ' + countryName + '</div>' +
-      '<div class="capital-weather" id="capitalWeather-' + cacheKey.replace(/\s/g, '_') + '">Loading...</div>' +
-      '<div class="mt-2">' +
-      '<a href="map.html?lat=' + lat + '&lon=' + lon + '&name=' + encodeURIComponent(capital + ', ' + countryName) + '" class="btn btn-sm btn-outline-success">' +
-      '<i class="bi bi-geo-alt"></i> View on Map</a>' +
-      '</div></div>';
-    shown++;
-  });
-  html += '</div>';
-  container.innerHTML = html;
-  document.getElementById('capitalsCount').textContent = 'Showing ' + (start + shown) + ' of ' + totalCapitals + ' capitals';
 
-  filtered.slice(start, end).forEach(function(country) {
+    const card = document.createElement('div');
+    card.className = 'frosted nearby-card p-2 text-center capital-card mx-1';
+    card.dataset.capital = capital;
+    card.dataset.country = countryName;
+    card.dataset.lat = lat;
+    card.dataset.lon = lon;
+
+    const title = createElementWithText('div', capital + ', ' + countryName, 'fw-bold');
+    const weatherDiv = createElementWithText('div', 'Loading...', 'capital-weather');
+    weatherDiv.id = 'capitalWeather-' + cacheKey.replace(/\s/g, '_');
+
+    const btnWrapper = createElementWithText('div', '', 'mt-2');
+    const mapBtn = document.createElement('a');
+    mapBtn.className = 'btn btn-sm btn-outline-success';
+    mapBtn.href = 'map.html?lat=' + lat + '&lon=' + lon + '&name=' + encodeURIComponent(capital + ', ' + countryName);
+    mapBtn.textContent = ' View on Map';
+
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-geo-alt';
+    mapBtn.prepend(icon);
+
+    btnWrapper.appendChild(mapBtn);
+    card.appendChild(title);
+    card.appendChild(weatherDiv);
+    card.appendChild(btnWrapper);
+    scrollWrapper.appendChild(card);
+  });
+
+  container.appendChild(scrollWrapper);
+  document.getElementById('capitalsCount').textContent = 'Showing ' + (start + sliced.length) + ' of ' + totalCapitals + ' capitals';
+
+  sliced.forEach(function(country) {
     const lat = country.latlng[0];
     const lon = country.latlng[1];
     const capital = country.capital[0];
     const countryName = country.name.common;
     const cacheKey = capital + ',' + countryName;
     const weatherDiv = document.getElementById('capitalWeather-' + cacheKey.replace(/\s/g, '_'));
+    if (!weatherDiv) return;
+
+    const updateDiv = function(weather) {
+      weatherDiv.textContent = Math.round(weather.main.temp) + '°C, ' + weather.weather[0].main + ' ';
+      const img = document.createElement('img');
+      img.src = 'https://openweathermap.org/img/wn/' + escapeHTML(weather.weather[0].icon) + '.png';
+      img.width = 32;
+      weatherDiv.appendChild(img);
+    };
 
     if (capitalsWeatherCache[cacheKey]) {
-      const weather = capitalsWeatherCache[cacheKey];
-      weatherDiv.innerHTML = Math.round(weather.main.temp) + '°C, ' + weather.weather[0].main +
-        ' <img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="32">';
+      updateDiv(capitalsWeatherCache[cacheKey]);
     } else {
       fetchWeatherApi('/weather', { lat: lat, lon: lon })
         .then(function(weather) {
           capitalsWeatherCache[cacheKey] = weather;
-          weatherDiv.innerHTML = Math.round(weather.main.temp) + '°C, ' + weather.weather[0].main +
-            ' <img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="32">';
+          updateDiv(weather);
         })
         .catch(function() {
-          weatherDiv.innerHTML = '<span class="text-danger">Failed to load</span>';
+          weatherDiv.textContent = '';
+          const errSpan = createElementWithText('span', 'Failed to load', 'text-danger');
+          weatherDiv.appendChild(errSpan);
         });
     }
   });
@@ -398,34 +422,31 @@ function renderCapitals(page, perPage, searchTerm) {
   setTimeout(function() {
     document.querySelectorAll('.capital-card').forEach(function(card) {
       card.onclick = function(e) {
-        if (e.target.tagName === 'A') return;
+        if (e.target.tagName === 'A' || e.target.closest('a')) return;
         showCapitalDetails(card.dataset.capital, card.dataset.country, card.dataset.lat, card.dataset.lon);
       };
     });
   }, 100);
 
   if (totalCapitals > perPage) {
-    setTimeout(function() {
-      let paginationHtml = '<div class="d-flex justify-content-center mt-2 gap-2">';
-      if (page > 1) {
-        paginationHtml += '<button class="btn btn-sm btn-outline-primary" id="prevCapitals">Previous</button>';
-      }
-      if (end < totalCapitals) {
-        paginationHtml += '<button class="btn btn-sm btn-outline-primary" id="nextCapitals">Next</button>';
-      }
-      paginationHtml += '</div>';
-      container.insertAdjacentHTML('beforeend', paginationHtml);
-      if (page > 1) {
-        document.getElementById('prevCapitals').onclick = function() {
-          fetchAllCapitalsWeather(page - 1, perPage, document.getElementById('capitalSearch').value);
-        };
-      }
-      if (end < totalCapitals) {
-        document.getElementById('nextCapitals').onclick = function() {
-          fetchAllCapitalsWeather(page + 1, perPage, document.getElementById('capitalSearch').value);
-        };
-      }
-    }, 200);
+    const paginationWrapper = createElementWithText('div', '', 'd-flex justify-content-center mt-2 gap-2');
+    if (page > 1) {
+      const prevBtn = createElementWithText('button', 'Previous', 'btn btn-sm btn-outline-primary');
+      prevBtn.id = 'prevCapitals';
+      prevBtn.onclick = function() {
+        fetchAllCapitalsWeather(page - 1, perPage, document.getElementById('capitalSearch').value);
+      };
+      paginationWrapper.appendChild(prevBtn);
+    }
+    if (end < totalCapitals) {
+      const nextBtn = createElementWithText('button', 'Next', 'btn btn-sm btn-outline-primary');
+      nextBtn.id = 'nextCapitals';
+      nextBtn.onclick = function() {
+        fetchAllCapitalsWeather(page + 1, perPage, document.getElementById('capitalSearch').value);
+      };
+      paginationWrapper.appendChild(nextBtn);
+    }
+    container.appendChild(paginationWrapper);
   }
 }
 
@@ -450,16 +471,32 @@ document.addEventListener('DOMContentLoaded', function() {
 function showCapitalDetails(capital, country, lat, lon) {
   fetchWeatherApi('/weather', { lat: lat, lon: lon })
     .then(function(weather) {
-      const html =
-        '<h5>' + capital + ', ' + country + '</h5>' +
-        '<div><img src="https://openweathermap.org/img/wn/' + weather.weather[0].icon + '.png" width="48"></div>' +
-        '<div><strong>' + Math.round(weather.main.temp) + '°C</strong> (' + weather.weather[0].main + ')</div>' +
-        '<div>Humidity: ' + weather.main.humidity + '%</div>' +
-        '<div>Pressure: ' + weather.main.pressure + ' hPa</div>' +
-        '<div>Wind: ' + formatWindSpeed(weather.wind.speed) + '</div>' +
-        '<div>Clouds: ' + weather.clouds.all + '%</div>' +
-        '<div>Visibility: ' + (weather.visibility / 1000) + ' km</div>';
-      document.getElementById('capitalModalBody').innerHTML = html;
+      const modalBody = document.getElementById('capitalModalBody');
+      modalBody.textContent = '';
+
+      const h5 = createElementWithText('h5', capital + ', ' + country);
+      const imgDiv = document.createElement('div');
+      const img = document.createElement('img');
+      img.src = 'https://openweathermap.org/img/wn/' + escapeHTML(weather.weather[0].icon) + '.png';
+      img.width = 48;
+      imgDiv.appendChild(img);
+
+      const tempDiv = createElementWithText('div', Math.round(weather.main.temp) + '°C (' + weather.weather[0].main + ')');
+      const humDiv = createElementWithText('div', 'Humidity: ' + weather.main.humidity + '%');
+      const pressDiv = createElementWithText('div', 'Pressure: ' + weather.main.pressure + ' hPa');
+      const windDiv = createElementWithText('div', 'Wind: ' + formatWindSpeed(weather.wind.speed));
+      const cloudDiv = createElementWithText('div', 'Clouds: ' + weather.clouds.all + '%');
+      const visDiv = createElementWithText('div', 'Visibility: ' + (weather.visibility / 1000) + ' km');
+
+      modalBody.appendChild(h5);
+      modalBody.appendChild(imgDiv);
+      modalBody.appendChild(tempDiv);
+      modalBody.appendChild(humDiv);
+      modalBody.appendChild(pressDiv);
+      modalBody.appendChild(windDiv);
+      modalBody.appendChild(cloudDiv);
+      modalBody.appendChild(visDiv);
+
       new bootstrap.Modal(document.getElementById('capitalModal')).show();
     })
     .catch(function() {

@@ -150,42 +150,87 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body" id="capitalModalBody">
+          <div id="weatherDate" class="mb-2 translatable">...</div>
+        </div>
+        <!-- Fun Fact Card -->
+        <div class="frosted tips-card mb-4 text-center" id="funFactCard">
+          <i class="bi bi-lightbulb-fill text-warning"></i>
+          <span id="funFactText">Loading fun fact...</span>
+        </div>
+        <!-- World Capitals Weather Card -->
+        <div class="frosted p-3 mb-4 world-capitals-card">
+          <div class="mb-2 d-flex align-items-center gap-2">
+            <i class="bi bi-globe"></i> <span class="translatable">World Capitals Weather</span>
+            <span id="capitalsCount" class="ms-2 small text-muted"></span>
+          </div>
+          <div class="mb-3">
+            <input type="text" id="capitalSearch" class="form-control" placeholder="Search capital or country...">
+          </div>
+          <div id="nearbyPlaces" class="horizontal-scroll"></div>
+        </div>
+      </div>
+      <!-- Forecast & Air Quality Card -->
+      <div class="col-lg-4 col-md-8">
+        <div class="frosted p-4 mb-4 air-card">
+          <ul class="nav nav-tabs mb-3" id="forecastTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active translatable" id="now-tab" data-bs-toggle="tab" data-bs-target="#now" type="button" role="tab">Now</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link translatable" id="hourly-tab" data-bs-toggle="tab" data-bs-target="#hourly" type="button" role="tab">24-hour</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link translatable" id="daily-tab" data-bs-toggle="tab" data-bs-target="#daily" type="button" role="tab">5-day</button>
+            </li>
+          </ul>
+          <div class="tab-content" id="forecastTabsContent">
+            <div class="tab-pane fade show active" id="now" role="tabpanel">
+              <div><i class="bi bi-thermometer-half"></i> <span class="translatable">Real Feel</span>: <span id="realFeel">--</span></div>
+              <div><i class="bi bi-wind"></i> <span class="translatable">Wind</span>: <span id="windSpeed">--</span></div>
+              <div><i class="bi bi-cloud-drizzle"></i> <span class="translatable">Chance of rain</span>: <span id="rainChance">--</span></div>
+              <div><i class="bi bi-brightness-high"></i> <span class="translatable">UV Index</span>: <span id="uvIndex">--</span></div>
+            </div>
+            <div class="tab-pane fade" id="hourly" role="tabpanel">
+              <div id="hourlyForecast" class="d-flex flex-row gap-3"></div>
+            </div>
+            <div class="tab-pane fade" id="daily" role="tabpanel">
+              <div id="forecastIcons" class="d-flex gap-2"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Air Quality Card (placeholder for future) -->
+        <div class="frosted air-quality-card mb-4 text-center d-none" id="airQualityCard">
+          <i class="bi bi-wind text-info"></i>
+          <span id="airQualityText">Air Quality: --</span>
+        </div>
+        <!-- Weather Alerts Card -->
+        <div class="frosted weather-alert-card mb-4" id="weatherAlertCard" style="display:none;">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size:1.5rem;"></i>
+            <span class="fw-bold">Weather Alert</span>
+          </div>
+          <div id="weatherAlertContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="capitalModal" tabindex="-1" aria-labelledby="capitalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title translatable" id="capitalModalLabel">Capital Weather Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="capitalModalBody">
         </div>
       </div>
     </div>
   </div>
 
   <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
   <script src="js/weather.js"></script>
-  <script src="js/translate.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="js/firebase-config.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/nav.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    function showLoader(show) {
-      const loader = document.getElementById('loaderOverlay');
-      if (show) loader.classList.add('active');
-      else loader.classList.remove('active');
-    }
-
-    function showToast(message, type) {
-      type = type || 'info';
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.innerHTML = message;
-      if (type === 'error') toast.style.background = '#ffebee', toast.style.color = '#b71c1c';
-      document.getElementById('toastContainer').appendChild(toast);
-      setTimeout(function() { toast.style.opacity = 0; toast.style.transform = 'translateY(-20px)'; }, 2500);
-      setTimeout(function() { toast.remove(); }, 3000);
-    }
-
-    document.getElementById('themeToggle').onclick = function() {
-      document.body.classList.toggle('dark-mode');
-      const icon = document.getElementById('themeIcon');
-      if (document.body.classList.contains('dark-mode')) {
         icon.classList.remove('bi-moon-stars-fill');
         icon.classList.add('bi-brightness-high-fill');
       } else {

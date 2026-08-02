@@ -1,11 +1,4 @@
-const WEATHER_API_BASE_URL = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.WEATHER_API_BASE_URL) || '/api';
 const GOOGLE_MAPS_API_KEY = (window.WEATHER_HUB_CONFIG && window.WEATHER_HUB_CONFIG.GOOGLE_MAPS_API_KEY) || "";
-
-function buildWeatherApiUrl(endpoint, params) {
-  const query = new URLSearchParams(params);
-  const base = WEATHER_API_BASE_URL.replace(/\/$/, '');
-  return base + endpoint + '?' + query.toString();
-}
 
 let map, marker, infowindow;
 
@@ -39,23 +32,25 @@ function initMap() {
   });
 
   const input = document.getElementById('mapSearch');
-  const searchBox = new google.maps.places.SearchBox(input);
+  if (input && google.maps.places) {
+    const searchBox = new google.maps.places.SearchBox(input);
 
-  searchBox.addListener('places_changed', function() {
-    const places = searchBox.getPlaces();
-    if (places.length === 0) return;
-    const place = places[0];
-    if (!place.geometry || !place.geometry.location) return;
-    map.setCenter(place.geometry.location);
-    placeMarker(place.geometry.location);
-    fetchWeather(place.geometry.location.lat(), place.geometry.location.lng());
-  });
+    searchBox.addListener('places_changed', function() {
+      const places = searchBox.getPlaces();
+      if (places.length === 0) return;
+      const place = places[0];
+      if (!place.geometry || !place.geometry.location) return;
+      map.setCenter(place.geometry.location);
+      placeMarker(place.geometry.location);
+      fetchWeather(place.geometry.location.lat(), place.geometry.location.lng());
+    });
+  }
 
   if (urlParams) {
     const location = new google.maps.LatLng(urlParams.lat, urlParams.lon);
     placeMarker(location);
     fetchWeather(urlParams.lat, urlParams.lon, urlParams.name);
-    if (urlParams.name) {
+    if (urlParams.name && input) {
       input.value = urlParams.name;
     }
     const routeInfo = document.getElementById('routeInfo');
@@ -74,7 +69,11 @@ function placeMarker(location) {
 }
 
 function fetchWeather(lat, lon, displayName) {
-  fetch(buildWeatherApiUrl('/weather', { lat: lat, lon: lon }))
+  const url = typeof buildWeatherApiUrl === 'function'
+    ? buildWeatherApiUrl('/weather', { lat: lat, lon: lon })
+    : '/api/weather?lat=' + lat + '&lon=' + lon;
+
+  fetch(url)
     .then(function(res) {
       return res.json().then(function(data) {
         if (!res.ok || (data.cod && Number(data.cod) !== 200)) {
@@ -85,19 +84,32 @@ function fetchWeather(lat, lon, displayName) {
     })
     .then(function(data) {
       const name = displayName || data.name;
-      const windKmh = Math.round(data.wind.speed * 3.6);
-      const content =
-        '<div class="weather-popup">' +
-        '<strong>' + name + '</strong><br>' +
-        data.weather[0].main + ', ' + Math.round(data.main.temp) + '°C<br>' +
-        'Humidity: ' + data.main.humidity + '%<br>' +
-        'Wind: ' + windKmh + ' km/h' +
-        '</div>';
-      infowindow.setContent(content);
+      const windKmh = typeof formatWindSpeed === 'function' ? formatWindSpeed(data.wind.speed) : Math.round(data.wind.speed * 3.6) + ' km/h';
+
+      const container = document.createElement('div');
+      container.className = 'weather-popup';
+
+      const titleEl = createElementWithText('strong', name);
+      container.appendChild(titleEl);
+      container.appendChild(document.createElement('br'));
+
+      const weatherText = createElementWithText('span', data.weather[0].main + ', ' + Math.round(data.main.temp) + '°C');
+      container.appendChild(weatherText);
+      container.appendChild(document.createElement('br'));
+
+      const humidityText = createElementWithText('span', 'Humidity: ' + data.main.humidity + '%');
+      container.appendChild(humidityText);
+      container.appendChild(document.createElement('br'));
+
+      const windText = createElementWithText('span', 'Wind: ' + windKmh);
+      container.appendChild(windText);
+
+      infowindow.setContent(container);
       infowindow.open(map, marker);
     })
     .catch(function(err) {
-      infowindow.setContent('<div class="weather-popup text-danger">' + (err.message || 'Failed to load weather') + '</div>');
+      const errDiv = createElementWithText('div', err.message || 'Failed to load weather', 'weather-popup text-danger');
+      infowindow.setContent(errDiv);
       infowindow.open(map, marker);
     });
 }
@@ -106,7 +118,9 @@ function loadGoogleMaps() {
   if (!GOOGLE_MAPS_API_KEY) {
     const mapEl = document.getElementById('map');
     if (mapEl) {
-      mapEl.innerHTML = '<div class="alert alert-warning m-3">Google Maps API key is not configured.</div>';
+      mapEl.textContent = '';
+      const warnDiv = createElementWithText('div', 'Google Maps API key is not configured.', 'alert alert-warning m-3');
+      mapEl.appendChild(warnDiv);
     }
     return;
   }
