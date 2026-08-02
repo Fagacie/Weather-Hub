@@ -1,3 +1,5 @@
+import { LANGUAGES } from '../i18n.js';
+
 const NAV_ITEMS = [
   { id: 'home', href: '/index.html', label: 'Home' },
   { id: 'map', href: '/map.html', label: 'Map' },
@@ -15,6 +17,10 @@ export function mountNav({ active = 'home', showTheme = false } = {}) {
     return `<li${liId}><a class="${cls}" href="${item.href}">${item.label}</a></li>`;
   }).join('');
 
+  const languageOptions = LANGUAGES.map(
+    (lang) => `<option value="${lang.code}">${lang.label}</option>`
+  ).join('');
+
   const themeBtn = showTheme
     ? `<button id="themeToggle" class="nav-icon-btn" title="Toggle dark/light mode" aria-label="Toggle theme">
          <i class="bi bi-moon-stars-fill" id="themeIcon"></i>
@@ -30,9 +36,7 @@ export function mountNav({ active = 'home', showTheme = false } = {}) {
         </a>
         <ul class="nav-links" id="navLinks">${links}</ul>
         <div class="nav-right">
-          <select id="languageSelect" class="nav-select" aria-label="Language">
-            <option value="en" selected>English</option>
-          </select>
+          <select id="languageSelect" class="nav-select" aria-label="Language">${languageOptions}</select>
           ${themeBtn}
           <div class="profile-dropdown" id="profileNavItem" style="display:none;">
             <div class="profile-avatar" id="profileDropdown" tabindex="0" role="button" aria-label="Profile menu" aria-expanded="false">

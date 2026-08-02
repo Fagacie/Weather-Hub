@@ -1,4 +1,11 @@
 {
+  "emulators": {
+    "hosting": { "port": 5000 },
+    "functions": { "port": 5001 },
+    "database": { "port": 9000 },
+    "auth": { "port": 9099 },
+    "ui": { "enabled": true }
+  },
   "database": {
     "rules": "database.rules.json"
   },

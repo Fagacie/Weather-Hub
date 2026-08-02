@@ -21,6 +21,17 @@ export function escapeHTML(str) {
     .replace(/'/g, '&#039;');
 }
 
+const ICON_CODE_RE = /^\d{2}[dn]$/;
+
+/**
+ * Builds an OpenWeather icon URL. HTML-escaping is the wrong transform for a
+ * URL, so the code is validated against the documented format instead.
+ */
+export function weatherIconUrl(code, size = '2x') {
+  const safeCode = ICON_CODE_RE.test(code) ? code : '01d';
+  return `https://openweathermap.org/img/wn/${safeCode}@${size}.png`;
+}
+
 export function createElementWithText(tag, text, className) {
   const el = document.createElement(tag);
   if (text) el.textContent = text;

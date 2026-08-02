@@ -12,7 +12,8 @@ import {
   fetchWeatherAndForecast,
   getLocationName,
   setLocationName,
-  initCapitalsSearch
+  initCapitalsSearch,
+  initWeatherLanguageSync
 } from '../js/weather.js';
 import { randomFunFact } from '../js/utils.js';
 
@@ -23,6 +24,7 @@ initThemeToggle();
 initNavScroll();
 initForecastTabs();
 initCapitalsSearch();
+initWeatherLanguageSync();
 
 const funFactEl = document.getElementById('funFactText');
 const funFactCard = document.getElementById('funFactCard');

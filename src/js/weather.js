@@ -1,10 +1,10 @@
-import { fetchWeatherApi } from './api.js';
-import { translateText } from './translate.js';
+import { fetchWeatherApi, fetchReverseGeocode, fetchUvIndex } from './api.js';
+import { translate, translateAll, getCurrentLanguage, onLanguageChange } from './translate.js';
 import { showLoader, showToast, initModal } from './ui.js';
 import {
   formatDate,
   formatWindSpeed,
-  escapeHTML,
+  weatherIconUrl,
   createElementWithText
 } from './utils.js';
 
@@ -12,6 +12,9 @@ let allCapitals = [];
 const capitalsWeatherCache = {};
 let searchTimeout = null;
 let capitalModalControls = null;
+let capitalsRequestToken = 0;
+let capitalsAbortController = null;
+let lastLocation = null;
 
 function setWeatherBackground(weather) {
   const classes = ['weather-clear', 'weather-clouds', 'weather-rain', 'weather-thunderstorm', 'weather-snow', 'weather-mist'];
@@ -47,69 +50,121 @@ function setAnimatedWeatherIcon(weather) {
   iconDiv.innerHTML = icons[key] || icons.clear;
 }
 
+/**
+ * OpenWeather can omit `wind`, `visibility` or return an empty `weather` array
+ * for some stations, so every read goes through a defaulted accessor.
+ */
+function readConditions(data) {
+  const condition = Array.isArray(data?.weather) && data.weather[0] ? data.weather[0] : {};
+  return {
+    main: condition.main || 'Clear',
+    description: condition.description || 'No description available',
+    icon: condition.icon || '01d',
+    temp: Number.isFinite(data?.main?.temp) ? data.main.temp : null,
+    feelsLike: Number.isFinite(data?.main?.feels_like) ? data.main.feels_like : null,
+    humidity: Number.isFinite(data?.main?.humidity) ? data.main.humidity : null,
+    pressure: Number.isFinite(data?.main?.pressure) ? data.main.pressure : null,
+    windSpeed: Number.isFinite(data?.wind?.speed) ? data.wind.speed : null,
+    clouds: Number.isFinite(data?.clouds?.all) ? data.clouds.all : null,
+    visibility: Number.isFinite(data?.visibility) ? data.visibility : null,
+    dt: Number.isFinite(data?.dt) ? data.dt : Math.floor(Date.now() / 1000)
+  };
+}
+
+function formatTemp(value) {
+  return Number.isFinite(value) ? `${Math.round(value)}°C` : '--';
+}
+
 function checkSevereWeatherAlerts(data) {
   const card = document.getElementById('weatherAlertCard');
   const content = document.getElementById('weatherAlertContent');
   if (!card || !content) return;
 
   content.textContent = '';
+  const conditions = readConditions(data);
   const alerts = [];
-  const temp = data.main.temp;
-  const wind = data.wind.speed;
-  const main = data.weather[0].main.toLowerCase();
-  const now = data.dt;
 
-  if (main === 'thunderstorm') {
-    alerts.push({ event: 'Thunderstorm Advisory', description: 'Thunderstorm conditions detected. Seek shelter if necessary.', start: now });
+  if (conditions.main.toLowerCase() === 'thunderstorm') {
+    alerts.push({ event: 'Thunderstorm Advisory', description: 'Thunderstorm conditions detected. Seek shelter if necessary.' });
   }
-  if (temp >= 38) {
-    alerts.push({ event: 'Extreme Heat Advisory', description: `Temperature is ${Math.round(temp)}°C. Stay hydrated and limit outdoor activity.`, start: now });
+  if (conditions.temp !== null && conditions.temp >= 38) {
+    alerts.push({ event: 'Extreme Heat Advisory', description: `Temperature is ${Math.round(conditions.temp)}°C. Stay hydrated and limit outdoor activity.` });
   }
-  if (temp <= -5) {
-    alerts.push({ event: 'Extreme Cold Advisory', description: `Temperature is ${Math.round(temp)}°C. Dress warmly and limit exposure.`, start: now });
+  if (conditions.temp !== null && conditions.temp <= -5) {
+    alerts.push({ event: 'Extreme Cold Advisory', description: `Temperature is ${Math.round(conditions.temp)}°C. Dress warmly and limit exposure.` });
   }
-  if (wind >= 15) {
-    alerts.push({ event: 'High Wind Advisory', description: `Wind speed is ${formatWindSpeed(wind)}. Secure loose objects outdoors.`, start: now });
+  if (conditions.windSpeed !== null && conditions.windSpeed >= 15) {
+    alerts.push({ event: 'High Wind Advisory', description: `Wind speed is ${formatWindSpeed(conditions.windSpeed)}. Secure loose objects outdoors.` });
   }
 
   card.style.display = '';
   if (alerts.length > 0) {
     const alert = alerts[0];
-    content.appendChild(createElementWithText('div', alert.event, 'fw-bold mb-1'));
-    content.appendChild(createElementWithText('div', alert.description, 'mb-1'));
-    content.appendChild(createElementWithText('div', `Detected at ${new Date(alert.start * 1000).toLocaleString()}`, 'small text-muted'));
+    content.appendChild(createElementWithText('div', alert.event, 'fw-bold mb-1 translatable'));
+    content.appendChild(createElementWithText('div', alert.description, 'mb-1 translatable'));
+    content.appendChild(createElementWithText('div', `Detected at ${new Date(conditions.dt * 1000).toLocaleString()}`, 'small text-muted'));
   } else {
-    content.appendChild(createElementWithText('span', 'No severe weather conditions detected for your area.', 'text-success'));
+    content.appendChild(createElementWithText('span', 'No severe weather conditions detected for your area.', 'text-success translatable'));
   }
+
+  translateAll(getCurrentLanguage(), content);
 }
 
-function displayWeatherData(data) {
-  const desc = data.weather[0].description;
-  const main = data.weather[0].main;
+async function displayWeatherData(data) {
+  const conditions = readConditions(data);
   const mainEl = document.getElementById('weatherMain');
-  const displayDesc = desc.charAt(0).toUpperCase() + desc.slice(1);
+  const displayDesc = conditions.description.charAt(0).toUpperCase() + conditions.description.slice(1);
 
   mainEl.textContent = displayDesc;
   mainEl.dataset.original = displayDesc;
-  document.getElementById('weatherTemp').textContent = `${Math.round(data.main.temp)}°C`;
-  document.getElementById('realFeel').textContent = `${Math.round(data.main.feels_like)}°`;
-  document.getElementById('windSpeed').textContent = formatWindSpeed(data.wind.speed);
-  document.getElementById('weatherDate').textContent = formatDate(data.dt);
+  document.getElementById('weatherTemp').textContent = formatTemp(conditions.temp);
+  document.getElementById('realFeel').textContent = Number.isFinite(conditions.feelsLike)
+    ? `${Math.round(conditions.feelsLike)}°`
+    : '--';
+  document.getElementById('windSpeed').textContent = conditions.windSpeed !== null
+    ? formatWindSpeed(conditions.windSpeed)
+    : '--';
+  document.getElementById('weatherDate').textContent = formatDate(conditions.dt);
 
-  setWeatherBackground(main);
-  setAnimatedWeatherIcon(main);
+  setWeatherBackground(conditions.main);
+  setAnimatedWeatherIcon(conditions.main);
   checkSevereWeatherAlerts(data);
 
-  const langSelect = document.getElementById('languageSelect');
-  if (langSelect) {
-    translateText(displayDesc, langSelect.value, (translated) => {
-      mainEl.textContent = translated;
-    });
+  // OpenWeather has no description for some languages, so translate as a backstop.
+  const lang = getCurrentLanguage();
+  if (lang !== 'en') {
+    try {
+      mainEl.textContent = await translate(displayDesc, lang);
+    } catch {
+      mainEl.textContent = displayDesc;
+    }
+  }
+}
+
+/**
+ * UV index comes from One Call 3.0, a separate subscription. When it is not
+ * available the tile is hidden rather than left showing a permanent dash.
+ */
+async function loadUvIndex(lat, lon) {
+  const valueEl = document.getElementById('uvIndex');
+  if (!valueEl) return;
+  const row = valueEl.closest('.now-stat-row') || valueEl.parentElement;
+
+  try {
+    const data = await fetchUvIndex(lat, lon);
+    if (data?.available && Number.isFinite(data.uvi)) {
+      valueEl.textContent = String(Math.round(data.uvi));
+      if (row) row.style.display = '';
+    } else if (row) {
+      row.style.display = 'none';
+    }
+  } catch {
+    if (row) row.style.display = 'none';
   }
 }
 
 export function getLocationName(lat, lon, callback) {
-  fetchWeatherApi('/reverse-geocode', { lat, lon })
+  fetchReverseGeocode(lat, lon, getCurrentLanguage())
     .then((data) => callback(data?.display_name || null))
     .catch(() => callback(null));
 }
@@ -120,21 +175,26 @@ export function setLocationName(name) {
   if (!el) return;
   el.textContent = name;
   el.dataset.original = name;
-  const langSelect = document.getElementById('languageSelect');
-  if (langSelect) {
-    translateText(name, langSelect.value, (translated) => {
-      el.textContent = translated;
-    });
+  el.classList.add('translatable');
+
+  const lang = getCurrentLanguage();
+  if (lang !== 'en') {
+    translate(name, lang)
+      .then((translated) => { el.textContent = translated; })
+      .catch(() => {});
   }
 }
 
 export function fetchWeatherAndForecast(lat, lon) {
+  lastLocation = { lat, lon };
   showLoader(true);
-  fetchWeatherApi('/weather', { lat, lon })
-    .then((data) => {
-      displayWeatherData(data);
+
+  fetchWeatherApi('/weather', { lat, lon, lang: getCurrentLanguage() })
+    .then(async (data) => {
+      await displayWeatherData(data);
       showLoader(false);
-      fetchForecast(lat, lon);
+      fetchForecast({ lat, lon });
+      loadUvIndex(lat, lon);
     })
     .catch((err) => {
       showLoader(false);
@@ -143,12 +203,17 @@ export function fetchWeatherAndForecast(lat, lon) {
 }
 
 export function fetchWeatherByCityAndForecast(city) {
+  lastLocation = { city };
   showLoader(true);
-  fetchWeatherApi('/weather', { city })
-    .then((data) => {
-      displayWeatherData(data);
+
+  fetchWeatherApi('/weather', { city, lang: getCurrentLanguage() })
+    .then(async (data) => {
+      await displayWeatherData(data);
       showLoader(false);
-      fetchForecastByCity(city);
+      fetchForecast({ city });
+      if (Number.isFinite(data?.coord?.lat) && Number.isFinite(data?.coord?.lon)) {
+        loadUvIndex(data.coord.lat, data.coord.lon);
+      }
     })
     .catch((err) => {
       showLoader(false);
@@ -156,63 +221,83 @@ export function fetchWeatherByCityAndForecast(city) {
     });
 }
 
-function fetchForecast(lat, lon) {
-  fetchWeatherApi('/forecast', { lat, lon })
+function fetchForecast(params) {
+  fetchWeatherApi('/forecast', { ...params, lang: getCurrentLanguage() })
     .then(renderForecast)
-    .catch(() => showToast('Failed to load forecast', 'error'));
+    .catch((err) => showToast(err.message || 'Failed to load forecast', 'error'));
 }
 
-function fetchForecastByCity(city) {
-  fetchWeatherApi('/forecast', { city })
-    .then(renderForecast)
-    .catch(() => showToast('Failed to load forecast', 'error'));
+function forecastImage(iconCode, size) {
+  const img = document.createElement('img');
+  img.src = weatherIconUrl(iconCode);
+  img.width = size;
+  img.height = size;
+  img.alt = '';
+  img.loading = 'lazy';
+  return img;
 }
 
 function renderForecast(data) {
+  const list = Array.isArray(data?.list) ? data.list : [];
   const hourlyDiv = document.getElementById('hourlyForecast');
   hourlyDiv.textContent = '';
   hourlyDiv.className = 'hourly-scroll';
 
-  data.list.slice(0, 8).forEach((item) => {
+  if (!list.length) {
+    hourlyDiv.appendChild(createElementWithText('div', 'Forecast unavailable.', 'text-muted'));
+    return;
+  }
+
+  list.slice(0, 8).forEach((item) => {
+    const conditions = readConditions(item);
+    // `dt_txt` ("2026-08-02 12:00:00") is not a valid Date string in Safari,
+    // so the epoch seconds are used instead.
+    const when = new Date(item.dt * 1000);
     const card = createElementWithText('div', '', 'hourly-item');
-    card.appendChild(createElementWithText('div', `${new Date(item.dt_txt).getHours()}:00`));
-    const imgEl = document.createElement('img');
-    imgEl.src = `https://openweathermap.org/img/wn/${escapeHTML(item.weather[0].icon)}.png`;
-    imgEl.width = 40;
-    card.appendChild(imgEl);
-    card.appendChild(createElementWithText('div', `${Math.round(item.main.temp)}°C`));
+    card.appendChild(createElementWithText('div', `${when.getHours()}:00`));
+    card.appendChild(forecastImage(conditions.icon, 40));
+    card.appendChild(createElementWithText('div', formatTemp(conditions.temp)));
     hourlyDiv.appendChild(card);
   });
 
   const iconsDiv = document.getElementById('forecastIcons');
   iconsDiv.textContent = '';
   iconsDiv.className = 'daily-forecast';
-  const days = {};
 
-  data.list.forEach((item) => {
-    const date = item.dt_txt.split(' ')[0];
-    const hour = item.dt_txt.split(' ')[1];
-    if (hour === '12:00:00' && !days[date]) days[date] = item;
+  const days = new Map();
+  list.forEach((item) => {
+    const when = new Date(item.dt * 1000);
+    const dayKey = when.toDateString();
+    if (when.getHours() >= 11 && when.getHours() <= 14 && !days.has(dayKey)) {
+      days.set(dayKey, item);
+    }
   });
 
-  Object.values(days).slice(0, 5).forEach((item) => {
+  // Fall back to the first entry per day if no midday slot exists.
+  if (days.size === 0) {
+    list.forEach((item) => {
+      const dayKey = new Date(item.dt * 1000).toDateString();
+      if (!days.has(dayKey)) days.set(dayKey, item);
+    });
+  }
+
+  Array.from(days.values()).slice(0, 5).forEach((item) => {
+    const conditions = readConditions(item);
+    const when = new Date(item.dt * 1000);
     const dayRow = createElementWithText('div', '', 'daily-item');
-    dayRow.appendChild(createElementWithText('span', new Date(item.dt_txt).toLocaleDateString(undefined, { weekday: 'short' }), 'day-name'));
-    const imgEl = document.createElement('img');
-    imgEl.src = `https://openweathermap.org/img/wn/${escapeHTML(item.weather[0].icon)}.png`;
-    imgEl.width = 32;
-    imgEl.height = 32;
-    dayRow.appendChild(imgEl);
-    dayRow.appendChild(createElementWithText('span', item.weather[0].main, 'day-desc'));
-    dayRow.appendChild(createElementWithText('span', `${Math.round(item.main.temp)}°C`, 'day-temp'));
+    dayRow.appendChild(createElementWithText('span', when.toLocaleDateString(undefined, { weekday: 'short' }), 'day-name'));
+    dayRow.appendChild(forecastImage(conditions.icon, 32));
+    dayRow.appendChild(createElementWithText('span', conditions.main, 'day-desc translatable'));
+    dayRow.appendChild(createElementWithText('span', formatTemp(conditions.temp), 'day-temp'));
     iconsDiv.appendChild(dayRow);
   });
 
-  if (data.list?.length) {
-    document.getElementById('rainChance').textContent =
-      data.list[0].pop !== undefined ? `${Math.round(data.list[0].pop * 100)}%` : '--';
+  const rainEl = document.getElementById('rainChance');
+  if (rainEl) {
+    rainEl.textContent = Number.isFinite(list[0]?.pop) ? `${Math.round(list[0].pop * 100)}%` : '--';
   }
-  document.getElementById('uvIndex').textContent = '--';
+
+  translateAll(getCurrentLanguage(), iconsDiv);
 }
 
 export function loadHomeWeather() {
@@ -233,7 +318,8 @@ export function loadHomeWeather() {
       fetchWeatherAndForecast(pos.coords.latitude, pos.coords.longitude);
       fetchAllCapitalsWeather();
     },
-    fallback
+    fallback,
+    { timeout: 10000, maximumAge: 300000 }
   );
 }
 
@@ -244,15 +330,15 @@ export function fetchAllCapitalsWeather(page = 1, perPage = 6, searchTerm = '') 
   document.getElementById('capitalsCount').textContent = '';
 
   if (allCapitals.length === 0) {
-    fetch('https://restcountries.com/v3.1/all?fields=capital,latlng,name')
+    fetch('https://restcountries.com/v3.1/all?fields=capital,latlng,name', {
+      signal: AbortSignal.timeout(12000)
+    })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load');
         return res.json();
       })
       .then((countries) => {
-        allCapitals = countries.filter(
-          (c) => c.capital?.length && c.latlng?.length === 2
-        );
+        allCapitals = countries.filter((c) => c.capital?.length && c.latlng?.length === 2);
         renderCapitals(page, perPage, searchTerm);
       })
       .catch(() => {
@@ -268,6 +354,14 @@ function renderCapitals(page, perPage, searchTerm) {
   const container = document.getElementById('nearbyPlaces');
   container.textContent = '';
 
+  // A token plus an AbortController stops responses from a previous search from
+  // writing into detached nodes once the list has been re-rendered.
+  capitalsRequestToken += 1;
+  const token = capitalsRequestToken;
+  capitalsAbortController?.abort();
+  capitalsAbortController = new AbortController();
+  const { signal } = capitalsAbortController;
+
   let filtered = allCapitals;
   if (searchTerm) {
     const term = searchTerm.toLowerCase();
@@ -278,7 +372,7 @@ function renderCapitals(page, perPage, searchTerm) {
 
   const totalCapitals = filtered.length;
   const start = (page - 1) * perPage;
-  const end = start + perPage;
+  const sliced = filtered.slice(start, start + perPage);
 
   if (!filtered.length) {
     container.appendChild(createElementWithText('div', 'No results found.', 'w-100 text-center py-3 text-muted'));
@@ -287,13 +381,12 @@ function renderCapitals(page, perPage, searchTerm) {
   }
 
   const scrollWrapper = createElementWithText('div', '', 'horizontal-scroll');
-  const sliced = filtered.slice(start, end);
+  const weatherSlots = new Map();
 
   sliced.forEach((country) => {
     const [lat, lon] = country.latlng;
     const capital = country.capital[0];
     const countryName = country.name.common;
-    const cacheKey = `${capital},${countryName}`;
 
     const card = document.createElement('div');
     card.className = 'capital-card';
@@ -304,98 +397,96 @@ function renderCapitals(page, perPage, searchTerm) {
 
     card.appendChild(createElementWithText('div', `${capital}, ${countryName}`, 'capital-name'));
     const weatherDiv = createElementWithText('div', 'Loading...', 'capital-weather');
-    weatherDiv.id = `capitalWeather-${cacheKey.replace(/\s/g, '_')}`;
+    card.appendChild(weatherDiv);
+    weatherSlots.set(`${capital},${countryName}`, weatherDiv);
 
     const mapBtn = document.createElement('a');
     mapBtn.className = 'map-link';
     mapBtn.href = `/map.html?lat=${lat}&lon=${lon}&name=${encodeURIComponent(`${capital}, ${countryName}`)}`;
     mapBtn.innerHTML = '<i class="bi bi-geo-alt"></i> View on Map';
-
-    card.appendChild(weatherDiv);
     card.appendChild(mapBtn);
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('a')) return;
+      showCapitalDetails(capital, countryName, lat, lon);
+    });
+
     scrollWrapper.appendChild(card);
   });
 
   container.appendChild(scrollWrapper);
   document.getElementById('capitalsCount').textContent = `Showing ${start + sliced.length} of ${totalCapitals} capitals`;
 
+  const renderSlot = (weatherDiv, weather) => {
+    const conditions = readConditions(weather);
+    weatherDiv.textContent = `${formatTemp(conditions.temp)}, ${conditions.main} `;
+    weatherDiv.appendChild(forecastImage(conditions.icon, 32));
+  };
+
   sliced.forEach((country) => {
     const [lat, lon] = country.latlng;
-    const capital = country.capital[0];
-    const countryName = country.name.common;
-    const cacheKey = `${capital},${countryName}`;
-    const weatherDiv = document.getElementById(`capitalWeather-${cacheKey.replace(/\s/g, '_')}`);
+    const cacheKey = `${country.capital[0]},${country.name.common}`;
+    const weatherDiv = weatherSlots.get(cacheKey);
     if (!weatherDiv) return;
 
-    const updateDiv = (weather) => {
-      weatherDiv.textContent = `${Math.round(weather.main.temp)}°C, ${weather.weather[0].main} `;
-      const img = document.createElement('img');
-      img.src = `https://openweathermap.org/img/wn/${escapeHTML(weather.weather[0].icon)}.png`;
-      img.width = 32;
-      weatherDiv.appendChild(img);
-    };
-
     if (capitalsWeatherCache[cacheKey]) {
-      updateDiv(capitalsWeatherCache[cacheKey]);
-    } else {
-      fetchWeatherApi('/weather', { lat, lon })
-        .then((weather) => {
-          capitalsWeatherCache[cacheKey] = weather;
-          updateDiv(weather);
-        })
-        .catch(() => {
-          weatherDiv.textContent = '';
-          weatherDiv.appendChild(createElementWithText('span', 'Failed to load', 'text-danger'));
-        });
+      renderSlot(weatherDiv, capitalsWeatherCache[cacheKey]);
+      return;
     }
-  });
 
-  setTimeout(() => {
-    document.querySelectorAll('.capital-card').forEach((card) => {
-      card.onclick = (e) => {
-        if (e.target.tagName === 'A' || e.target.closest('a')) return;
-        showCapitalDetails(card.dataset.capital, card.dataset.country, card.dataset.lat, card.dataset.lon);
-      };
-    });
-  }, 100);
+    fetchWeatherApi('/weather', { lat, lon, lang: getCurrentLanguage() }, { signal })
+      .then((weather) => {
+        if (token !== capitalsRequestToken) return;
+        capitalsWeatherCache[cacheKey] = weather;
+        renderSlot(weatherDiv, weather);
+      })
+      .catch((err) => {
+        if (token !== capitalsRequestToken || err.name === 'AbortError') return;
+        weatherDiv.textContent = '';
+        weatherDiv.appendChild(createElementWithText('span', 'Failed to load', 'text-danger'));
+      });
+  });
 
   if (totalCapitals > perPage) {
     const paginationWrapper = createElementWithText('div', '', 'capitals-pagination');
     if (page > 1) {
-      const prevBtn = createElementWithText('button', 'Previous', '');
+      const prevBtn = createElementWithText('button', 'Previous', 'translatable');
       prevBtn.onclick = () => fetchAllCapitalsWeather(page - 1, perPage, document.getElementById('capitalSearch').value);
       paginationWrapper.appendChild(prevBtn);
     }
-    if (end < totalCapitals) {
-      const nextBtn = createElementWithText('button', 'Next', '');
+    if (start + perPage < totalCapitals) {
+      const nextBtn = createElementWithText('button', 'Next', 'translatable');
       nextBtn.onclick = () => fetchAllCapitalsWeather(page + 1, perPage, document.getElementById('capitalSearch').value);
       paginationWrapper.appendChild(nextBtn);
     }
     container.appendChild(paginationWrapper);
   }
+
+  translateAll(getCurrentLanguage(), container);
 }
 
 function showCapitalDetails(capital, country, lat, lon) {
-  fetchWeatherApi('/weather', { lat, lon })
+  fetchWeatherApi('/weather', { lat, lon, lang: getCurrentLanguage() })
     .then((weather) => {
+      const conditions = readConditions(weather);
       const modalBody = document.getElementById('capitalModalBody');
       modalBody.textContent = '';
       modalBody.appendChild(createElementWithText('h5', `${capital}, ${country}`));
+
       const imgDiv = document.createElement('div');
-      const img = document.createElement('img');
-      img.src = `https://openweathermap.org/img/wn/${escapeHTML(weather.weather[0].icon)}.png`;
-      img.width = 48;
-      imgDiv.appendChild(img);
+      imgDiv.appendChild(forecastImage(conditions.icon, 48));
       modalBody.appendChild(imgDiv);
-      modalBody.appendChild(createElementWithText('div', `${Math.round(weather.main.temp)}°C (${weather.weather[0].main})`));
-      modalBody.appendChild(createElementWithText('div', `Humidity: ${weather.main.humidity}%`));
-      modalBody.appendChild(createElementWithText('div', `Pressure: ${weather.main.pressure} hPa`));
-      modalBody.appendChild(createElementWithText('div', `Wind: ${formatWindSpeed(weather.wind.speed)}`));
-      modalBody.appendChild(createElementWithText('div', `Clouds: ${weather.clouds.all}%`));
-      modalBody.appendChild(createElementWithText('div', `Visibility: ${weather.visibility / 1000} km`));
+
+      modalBody.appendChild(createElementWithText('div', `${formatTemp(conditions.temp)} (${conditions.main})`));
+      modalBody.appendChild(createElementWithText('div', `Humidity: ${conditions.humidity ?? '--'}%`));
+      modalBody.appendChild(createElementWithText('div', `Pressure: ${conditions.pressure ?? '--'} hPa`));
+      modalBody.appendChild(createElementWithText('div', `Wind: ${conditions.windSpeed !== null ? formatWindSpeed(conditions.windSpeed) : '--'}`));
+      modalBody.appendChild(createElementWithText('div', `Clouds: ${conditions.clouds ?? '--'}%`));
+      modalBody.appendChild(createElementWithText('div', `Visibility: ${conditions.visibility !== null ? `${conditions.visibility / 1000} km` : '--'}`));
+
       capitalModalControls?.open();
     })
-    .catch(() => showToast('Failed to load capital weather details', 'error'));
+    .catch((err) => showToast(err.message || 'Failed to load capital weather details', 'error'));
 }
 
 export function initCapitalsSearch() {
@@ -406,6 +497,22 @@ export function initCapitalsSearch() {
   searchInput.addEventListener('input', debounce(() => {
     fetchAllCapitalsWeather(1, 6, searchInput.value);
   }, 400));
+}
+
+/**
+ * Weather descriptions are localised upstream, so switching language refetches
+ * rather than translating stale English text.
+ */
+export function initWeatherLanguageSync() {
+  onLanguageChange(() => {
+    if (!lastLocation) return;
+    Object.keys(capitalsWeatherCache).forEach((key) => delete capitalsWeatherCache[key]);
+    if (lastLocation.city) {
+      fetchWeatherByCityAndForecast(lastLocation.city);
+    } else {
+      fetchWeatherAndForecast(lastLocation.lat, lastLocation.lon);
+    }
+  });
 }
 
 function debounce(fn, delay) {
