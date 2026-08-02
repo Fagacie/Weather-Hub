@@ -14,14 +14,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WEATHER_HUB_9C3F8 }}
+          cache: npm
       - run: |
           if [ -n "$WEATHER_HUB_CONFIG_JS" ]; then
+            mkdir -p js
             printf '%s' "$WEATHER_HUB_CONFIG_JS" > js/config.js
           fi
         env:
           WEATHER_HUB_CONFIG_JS: ${{ secrets.WEATHER_HUB_CONFIG_JS }}
+      - run: npm ci
+      - run: npm run build
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WEATHER_HUB_9C3F8 }}
       - run: npm install -g firebase-tools
       - run: firebase deploy --only hosting,functions --project weather-hub-9c3f8 --non-interactive

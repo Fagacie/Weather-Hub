@@ -64,7 +64,13 @@ node_modules/
 
 # dotenv environment variables file
 .env
+.env.local
+.env.production
 js/config.js
+
+# Vite build output
+dist/
+node_modules/
 
 # dataconnect generated files
 .dataconnect

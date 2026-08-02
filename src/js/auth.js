@@ -1,11 +1,10 @@
-function isFirebaseReady() {
-  return typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0;
-}
+import { firebase, initFirebase, isFirebaseReady } from './firebase.js';
 
-// Register a new user with input sanitization and Promise/Callback dual support
-async function registerUser(email, password, username, phone, callback) {
+initFirebase();
+
+export async function registerUser(email, password, username, phone, callback) {
   if (!isFirebaseReady()) {
-    const err = new Error('Firebase is not configured yet. Please add your Firebase credentials in js/config.js');
+    const err = new Error('Firebase is not configured. Add credentials to .env.local');
     if (typeof callback === 'function') callback(err);
     throw err;
   }
@@ -24,7 +23,7 @@ async function registerUser(email, password, username, phone, callback) {
     const userCredential = await firebase.auth().createUserWithEmailAndPassword(cleanEmail, password);
     const user = userCredential.user;
 
-    await firebase.database().ref('users/' + user.uid).set({
+    await firebase.database().ref(`users/${user.uid}`).set({
       email: cleanEmail,
       username: cleanUsername,
       phone: cleanPhone,
@@ -39,10 +38,9 @@ async function registerUser(email, password, username, phone, callback) {
   }
 }
 
-// Login user
-async function loginUser(email, password, callback) {
+export async function loginUser(email, password, callback) {
   if (!isFirebaseReady()) {
-    const err = new Error('Firebase is not configured yet. Please add your Firebase credentials in js/config.js');
+    const err = new Error('Firebase is not configured. Add credentials to .env.local');
     if (typeof callback === 'function') callback(err);
     throw err;
   }
@@ -59,8 +57,7 @@ async function loginUser(email, password, callback) {
   }
 }
 
-// Logout user
-async function logoutUser(callback) {
+export async function logoutUser(callback) {
   if (!isFirebaseReady()) {
     const err = new Error('Firebase is not initialized.');
     if (typeof callback === 'function') callback(err);
@@ -76,8 +73,7 @@ async function logoutUser(callback) {
   }
 }
 
-// Listen for auth state changes
-function onAuthStateChanged(callback) {
+export function onAuthStateChanged(callback) {
   if (!isFirebaseReady()) {
     if (typeof callback === 'function') callback(null);
     return;
@@ -85,8 +81,9 @@ function onAuthStateChanged(callback) {
   firebase.auth().onAuthStateChanged(callback);
 }
 
-// Get current user
-function getCurrentUser() {
+export function getCurrentUser() {
   if (!isFirebaseReady()) return null;
   return firebase.auth().currentUser;
 }
+
+export { firebase };

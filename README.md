@@ -1,55 +1,97 @@
 # WeatherHub – Smart Weather Application
 
 ## Overview
-A web application that provides real-time weather updates using external APIs.
+A modern weather web app with real-time forecasts, interactive maps, user profiles, and world capitals weather.
 
-## Problem Statement
-Users need quick and accurate access to weather information for planning daily activities.
+## Tech Stack
+- **Frontend:** Vite, vanilla JavaScript (ES modules), CSS
+- **Backend:** Firebase Cloud Functions (API proxy)
+- **Auth & Database:** Firebase Auth + Realtime Database
+- **Hosting:** Firebase Hosting
 
-## Technologies Used
-- JavaScript
-- Node.js
-- Weather API
+## Quick Start
 
-## Features
-- Real-time weather data retrieval
-- API integration
-- User-friendly interface
-
-## Local Configuration
-Browser configuration is loaded from `js/config.js`, which is ignored by git so deploy-specific values are not committed.
-
-1. Copy `js/config.example.js` to `js/config.js`.
-2. Fill in your Google Maps, Google Translate, and Firebase project values.
-3. Open `index.html` locally or deploy with your own `js/config.js` supplied in the hosting environment.
-
-For GitHub Actions deploys, add a repository secret named `WEATHER_HUB_CONFIG_JS` containing the full contents of `js/config.js`. The deploy workflow writes it into place before Firebase Hosting uploads the site.
-
-## Firebase Functions
-OpenWeather calls are proxied through Firebase Functions so the OpenWeather key is not shipped to the browser.
-
-Set the function secret before deploying:
-
+### 1. Install dependencies
 ```bash
-firebase functions:secrets:set OPENWEATHER_API_KEY
+npm install
 ```
 
-The frontend calls:
+### 2. Configure environment
+Copy `.env.example` to `.env.local` and fill in your values:
 
-- `GET /api/weather?lat=&lon=`
-- `GET /api/weather?city=`
-- `GET /api/forecast?lat=&lon=`
-- `GET /api/forecast?city=`
+```bash
+cp .env.example .env.local
+```
 
-## System Workflow
-User inputs location → API fetches weather data → system processes data → UI displays results.
+Required for full functionality:
+- `VITE_FIREBASE_*` — Firebase project credentials
+- `VITE_GOOGLE_MAPS_API_KEY` — Google Maps (map page)
+- `VITE_WEATHER_API_BASE_URL=/api` — leave as `/api` for production
 
-## Results / Output
-Displays real-time weather conditions for selected locations.
+**Legacy:** If you still use `js/config.js`, the build script auto-generates `.env.production` from it.
 
-## Demo / Live Link
-https://weather-hub-9c3f8.web.app/
+### 3. Run locally
+```bash
+# Terminal 1 — Vite dev server (proxies /api to Firebase emulator)
+npm run dev
 
+# Terminal 2 — Firebase emulators (functions + hosting rewrites)
+firebase emulators:start
+```
+
+Open http://localhost:5173
+
+### 4. Production build
+```bash
+npm run build
+firebase deploy --only hosting,functions
+```
+
+Build output goes to `dist/`.
+
+## Project Structure
+```
+src/
+├── js/
+│   ├── api.js          # Centralized API client
+│   ├── auth.js         # Firebase auth helpers
+│   ├── config.js       # Env-based configuration
+│   ├── weather.js      # Weather dashboard logic
+│   ├── map.js          # Google Maps integration
+│   ├── nav.js          # Auth-aware navigation
+│   ├── translate.js    # i18n via API proxy
+│   ├── ui.js           # Loader, toast, theme, tabs
+│   └── components/
+│       └── nav.js      # Shared nav component
+├── pages/              # Page entry points (one per HTML file)
+└── styles/
+    └── main.css
+```
+
+## API Endpoints (Cloud Functions)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Service health check |
+| `/api/config/public` | GET | Public client config (Google Maps key) |
+| `/api/weather` | GET | Current weather (`?lat=&lon=` or `?city=`) |
+| `/api/forecast` | GET | Forecast (`?lat=&lon=` or `?city=`) |
+| `/api/reverse-geocode` | GET | Reverse geocode (`?lat=&lon=`) |
+| `/api/translate` | POST | Translate text (`{ text, target }`) |
+| `/api/contact` | POST | Submit contact form (`{ name, email, message }`) |
+
+All routes are rate-limited per IP. Contact messages are stored in Firebase Realtime Database (`contactMessages/`) via Admin SDK — not writable from the browser.
+
+Set function secrets before deploy:
+```bash
+firebase functions:secrets:set OPENWEATHER_API_KEY
+firebase functions:secrets:set GOOGLE_TRANSLATE_API_KEY
+firebase functions:secrets:set GOOGLE_MAPS_API_KEY
+```
+
+## CI/CD
+GitHub Actions runs `npm run build` then deploys `dist/` to Firebase Hosting.
+
+Set repository secret `WEATHER_HUB_CONFIG_JS` with legacy config contents, or configure env vars in the workflow.
 
 ## Author
 Abbas Usman Adamu

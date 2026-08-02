@@ -2,7 +2,7 @@
   "rules": {
     "users": {
       "$uid": {
-        ".read": "auth != null",
+        ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
         ".validate": "newData.hasChildren(['email', 'username'])",
         "email": {
@@ -18,6 +18,10 @@
           ".validate": "newData.isString()"
         }
       }
+    },
+    "contactMessages": {
+      ".read": false,
+      ".write": false
     }
   }
 }

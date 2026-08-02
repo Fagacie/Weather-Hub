@@ -13,6 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: |
+          if [ -n "$WEATHER_HUB_CONFIG_JS" ]; then
+            mkdir -p js
+            printf '%s' "$WEATHER_HUB_CONFIG_JS" > js/config.js
+          fi
+        env:
+          WEATHER_HUB_CONFIG_JS: ${{ secrets.WEATHER_HUB_CONFIG_JS }}
+      - run: npm ci
+      - run: npm run build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
