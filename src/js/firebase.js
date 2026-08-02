@@ -4,26 +4,41 @@ import 'firebase/compat/database';
 import { getConfig } from './config.js';
 
 let initialized = false;
+let initError = null;
 
 export function initFirebase() {
   if (initialized) return true;
 
   const firebaseConfig = getConfig().FIREBASE_CONFIG;
-  if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-    console.warn('Firebase config is missing. Copy .env.example to .env.local and fill in your values.');
+  const missing = ['apiKey', 'projectId', 'authDomain', 'databaseURL']
+    .filter((key) => !firebaseConfig[key]);
+
+  if (missing.length > 0) {
+    initError = `Firebase config is missing: ${missing.join(', ')}`;
+    console.error(initError, firebaseConfig);
     return false;
   }
 
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    initialized = true;
+    initError = null;
+    return true;
+  } catch (error) {
+    initError = error.message;
+    console.error('Firebase failed to initialize:', error);
+    return false;
   }
-
-  initialized = true;
-  return true;
 }
 
 export function isFirebaseReady() {
-  return initialized && typeof firebase !== 'undefined' && firebase.apps.length > 0;
+  return initialized && firebase.apps.length > 0;
+}
+
+export function getInitError() {
+  return initError;
 }
 
 export { firebase };

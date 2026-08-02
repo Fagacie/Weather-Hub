@@ -4,29 +4,39 @@ import { loginUser, onAuthStateChanged } from '../js/auth.js';
 
 initTranslation();
 
-let isLoggingIn = false;
+const form = document.getElementById('loginForm');
+const msg = document.getElementById('loginMsg');
+const submitBtn = form?.querySelector('button[type="submit"]');
+
+let submitting = false;
+
 onAuthStateChanged((user) => {
-  if (user && !isLoggingIn) window.location.href = '/index.html';
+  if (user && !submitting) window.location.href = '/index.html';
 });
 
-document.getElementById('loginForm')?.addEventListener('submit', (e) => {
-  e.preventDefault();
-  isLoggingIn = true;
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
-  const msg = document.getElementById('loginMsg');
-  msg.className = 'auth-msg';
-  msg.textContent = '';
+function setMessage(text, type) {
+  msg.textContent = text;
+  msg.className = type ? `auth-msg ${type}` : 'auth-msg';
+}
 
-  loginUser(email, password, (error) => {
-    if (error) {
-      isLoggingIn = false;
-      msg.textContent = error.message;
-      msg.classList.add('error');
-    } else {
-      msg.textContent = 'Login successful!';
-      msg.classList.add('success');
-      setTimeout(() => { window.location.href = '/index.html'; }, 1200);
-    }
-  });
+form?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (submitting) return;
+
+  submitting = true;
+  if (submitBtn) submitBtn.disabled = true;
+  setMessage('Signing in...');
+
+  try {
+    await loginUser(
+      document.getElementById('loginEmail').value,
+      document.getElementById('loginPassword').value
+    );
+    setMessage('Login successful! Redirecting...', 'success');
+    window.location.href = '/index.html';
+  } catch (error) {
+    submitting = false;
+    if (submitBtn) submitBtn.disabled = false;
+    setMessage(error.message, 'error');
+  }
 });

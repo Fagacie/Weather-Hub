@@ -18,9 +18,9 @@ export function initNav() {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      logoutUser((err) => {
-        if (!err) window.location.href = '/login.html';
-      });
+      logoutUser()
+        .then(() => { window.location.href = '/login.html'; })
+        .catch((err) => console.error('Logout failed:', err));
     });
   }
 

@@ -4,31 +4,41 @@ import { registerUser, onAuthStateChanged } from '../js/auth.js';
 
 initTranslation();
 
-let isRegistering = false;
+const form = document.getElementById('registerForm');
+const msg = document.getElementById('registerMsg');
+const submitBtn = form?.querySelector('button[type="submit"]');
+
+let submitting = false;
+
 onAuthStateChanged((user) => {
-  if (user && !isRegistering) window.location.href = '/index.html';
+  if (user && !submitting) window.location.href = '/index.html';
 });
 
-document.getElementById('registerForm')?.addEventListener('submit', (e) => {
-  e.preventDefault();
-  isRegistering = true;
-  const email = document.getElementById('registerEmail').value.trim();
-  const password = document.getElementById('registerPassword').value;
-  const username = document.getElementById('registerUsername').value.trim();
-  const phone = document.getElementById('registerPhone').value.trim();
-  const msg = document.getElementById('registerMsg');
-  msg.className = 'auth-msg';
-  msg.textContent = '';
+function setMessage(text, type) {
+  msg.textContent = text;
+  msg.className = type ? `auth-msg ${type}` : 'auth-msg';
+}
 
-  registerUser(email, password, username, phone, (error) => {
-    if (error) {
-      isRegistering = false;
-      msg.textContent = error.message;
-      msg.classList.add('error');
-    } else {
-      msg.textContent = 'Registration successful!';
-      msg.classList.add('success');
-      setTimeout(() => { window.location.href = '/index.html'; }, 1200);
-    }
-  });
+form?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (submitting) return;
+
+  submitting = true;
+  if (submitBtn) submitBtn.disabled = true;
+  setMessage('Creating your account...');
+
+  try {
+    await registerUser(
+      document.getElementById('registerEmail').value,
+      document.getElementById('registerPassword').value,
+      document.getElementById('registerUsername').value,
+      document.getElementById('registerPhone').value
+    );
+    setMessage('Registration successful! Redirecting...', 'success');
+    window.location.href = '/index.html';
+  } catch (error) {
+    submitting = false;
+    if (submitBtn) submitBtn.disabled = false;
+    setMessage(error.message, 'error');
+  }
 });

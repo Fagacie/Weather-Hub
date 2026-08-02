@@ -68,7 +68,9 @@ document.getElementById('editProfileForm')?.addEventListener('submit', (e) => {
 });
 
 document.getElementById('logoutBtn')?.addEventListener('click', () => {
-  logoutUser(() => { window.location.href = '/login.html'; });
+  logoutUser()
+    .then(() => { window.location.href = '/login.html'; })
+    .catch((err) => console.error('Logout failed:', err));
 });
 
 document.getElementById('weatherFact').textContent = randomFunFact();
